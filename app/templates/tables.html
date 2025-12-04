@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>📂 Table List</h2>
+<p>테이블 검색 / 페이징 / 정렬 / 클릭 상세 이동</p>
+
+<!-- APP Filter -->
+<div class="mb-3">
+    <label><b>App Code Filter</b></label>
+    <select id="appFilter" class="form-select" style="width:200px;">
+        <option value="">ALL</option>
+        <option value="FIN">FIN</option>
+        <option value="CRM">CRM</option>
+        <option value="INS">INS</option>
+    </select>
+</div>
+
+<table id="tableList" class="table table-bordered table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>App Code</th>
+            <th>Table Name</th>
+            <th>Error Count</th>
+            <th>Normal Count</th>
+            <th>Error Rate</th>
+            <th style="display:none;">Columns</th>   <!-- 🔥 hidden column -->
+        </tr>
+    </thead>
+    <tbody>
+    {% for t in tables %}
+        <tr>
+            <td>{{ t.app_code }}</td>
+            <td>{{ t.table_name }}</td>
+            <td>{{ t.error_cnt }}</td>
+            <td>{{ t.normal_cnt }}</td>
+            <td>{{ t.error_rate }}%</td>
+
+            <td style="display:none;">
+            {% if sample_columns.get(t.table_name) %}
+                {{ sample_columns[t.table_name] | map(attribute='column') | join(', ') }}
+            {% else %}
+                ""
+            {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+
+</table>
+
+<!-- DataTables CSS/JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+$(document).ready(function () {
+
+    // DataTable 초기화
+    const table = $('#tableList').DataTable({
+        pageLength: 50,
+        ordering: true,
+        searching: true,
+        paging: true,
+        lengthChange: false,
+        columnDefs: [
+            { targets: [5], visible: false, searchable: true }  // hidden column index
+        ]
+    });
+
+    // URL 파라미터(app) 기반 드롭다운/테이블 동기화
+    const selectedApp = "{{ selected_app }}";
+    if (selectedApp) {
+        $('#appFilter').val(selectedApp);
+        table.column(0).search('^' + selectedApp + '$', true, false).draw();
+    }
+
+    // Filter 이벤트 → URL 이동
+    $('#appFilter').on('change', function () {
+        const val = $(this).val();
+        let newUrl = "/tables";
+        if (val) newUrl = `/tables?app=${val}`;
+        window.location.href = newUrl;
+    });
+
+    // Row Click → Detail 이동
+    $('#tableList').on('click', 'tbody tr', function () {
+        const tableName = $(this).find('td:eq(1)').text();
+        window.location.href = `/detail/${tableName}`;
+    });
+
+});
+</script>
+
+{% endblock %}

@@ -1,37 +1,110 @@
-<h2>데이터 품질 모니터링 Dashboard</h2>
-<hr>
+{% extends "layout.html" %}
+{% block content %}
 
-<div class="alert alert-warning">
-    📌 현재 표시할 데이터가 없습니다. MySQL 데이터 준비 후 연결하세요.
+<h2 class="mb-4">📊 Data Quality Dashboard</h2>
+
+<!-- KPI Summary Cards -->
+<div class="row g-3">
+
+    <!-- 전체 KPI -->
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 rounded-4 bg-primary text-white">
+            <div class="card-body">
+                <h6 class="fw-bold">Total Records</h6>
+                <h3 class="fw-bold">{{ kpi.total_cnt }}</h3>
+                <p class="mb-0 small">오류율 {{ kpi.error_rate }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 rounded-4 bg-danger text-white">
+            <div class="card-body">
+                <h6 class="fw-bold">Error Records</h6>
+                <h3 class="fw-bold">{{ kpi.error_cnt }}</h3>
+                <p class="mb-0 small">오류 데이터 수</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 rounded-4 bg-success text-white">
+            <div class="card-body">
+                <h6 class="fw-bold">Normal Records</h6>
+                <h3 class="fw-bold">{{ kpi.normal_cnt }}</h3>
+                <p class="mb-0 small">정상 데이터 수</p>
+            </div>
+        </div>
+    </div>
+
 </div>
 
-<canvas id="tableChart" height="100"></canvas>
+<hr class="my-4">
 
-<h4 class="mt-4">테이블 오류 상세</h4>
-<table id="detailTable" class="table table-striped">
-    <thead>
-        <tr>
-            <th>테이블명</th>
-            <th>오류건수</th>
-            <th>정상건수</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- 데이터 없을 때 표시 -->
-    </tbody>
-</table>
+<!-- 테이블 KPI -->
+<h4 class="fw-bold mb-3">📁 Table KPI</h4>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm">
+            <div class="card-body text-center">
+                <h6>검증 테이블수</h6>
+                <h2 class="fw-bold">{{ table_kpi.verified }}</h2>
+            </div>
+        </div>
+    </div>
 
-<script>
-    // 데이터 비었으면 차트 안보여줌
-    const tableData = {{ table_json | safe }};
-    if (tableData.length > 0) {
-        const labels = tableData.map(x => x.table_name);
-        const values = tableData.map(x => x.error_cnt);
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm border-danger">
+            <div class="card-body text-center text-danger">
+                <h6>오류 테이블</h6>
+                <h2 class="fw-bold">{{ table_kpi.error }}</h2>
+            </div>
+        </div>
+    </div>
 
-        new Chart(document.getElementById('tableChart'), {
-            type: "bar",
-            data: { labels: labels, datasets: [{ data: values }] }
-        });
-    }
-</script>
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm border-success">
+            <div class="card-body text-center text-success">
+                <h6>정상 테이블</h6>
+                <h2 class="fw-bold">{{ table_kpi.normal }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
 
+<hr class="my-4">
+
+<!-- 컬럼 KPI -->
+<h4 class="fw-bold mb-3">🔠 Column KPI</h4>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm">
+            <div class="card-body text-center">
+                <h6>검증 컬럼수</h6>
+                <h2 class="fw-bold">{{ column_kpi.verified }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm border-danger">
+            <div class="card-body text-center text-danger">
+                <h6>오류 컬럼</h6>
+                <h2 class="fw-bold">{{ column_kpi.error }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card rounded-4 shadow-sm border-success">
+            <div class="card-body text-center text-success">
+                <h6>정상 컬럼</h6>
+                <h2 class="fw-bold">{{ column_kpi.normal }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<p>📌 상세 보기는 왼쪽 메뉴의 **Table Detail** 을 선택하세요.</p>
+
+{% endblock %}
