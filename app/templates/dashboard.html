@@ -1,0 +1,37 @@
+<h2>데이터 품질 모니터링 Dashboard</h2>
+<hr>
+
+<div class="alert alert-warning">
+    📌 현재 표시할 데이터가 없습니다. MySQL 데이터 준비 후 연결하세요.
+</div>
+
+<canvas id="tableChart" height="100"></canvas>
+
+<h4 class="mt-4">테이블 오류 상세</h4>
+<table id="detailTable" class="table table-striped">
+    <thead>
+        <tr>
+            <th>테이블명</th>
+            <th>오류건수</th>
+            <th>정상건수</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- 데이터 없을 때 표시 -->
+    </tbody>
+</table>
+
+<script>
+    // 데이터 비었으면 차트 안보여줌
+    const tableData = {{ table_json | safe }};
+    if (tableData.length > 0) {
+        const labels = tableData.map(x => x.table_name);
+        const values = tableData.map(x => x.error_cnt);
+
+        new Chart(document.getElementById('tableChart'), {
+            type: "bar",
+            data: { labels: labels, datasets: [{ data: values }] }
+        });
+    }
+</script>
+
