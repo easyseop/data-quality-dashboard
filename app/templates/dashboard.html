@@ -3,108 +3,102 @@
 
 <h2 class="mb-4">📊 Data Quality Dashboard</h2>
 
-<!-- KPI Summary Cards -->
-<div class="row g-3">
-
-    <!-- 전체 KPI -->
-    <div class="col-md-3">
-        <div class="card shadow-sm border-0 rounded-4 bg-primary text-white">
-            <div class="card-body">
-                <h6 class="fw-bold">Total Records</h6>
-                <h3 class="fw-bold">{{ kpi.total_cnt }}</h3>
-                <p class="mb-0 small">오류율 {{ kpi.error_rate }}%</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card shadow-sm border-0 rounded-4 bg-danger text-white">
-            <div class="card-body">
-                <h6 class="fw-bold">Error Records</h6>
-                <h3 class="fw-bold">{{ kpi.error_cnt }}</h3>
-                <p class="mb-0 small">오류 데이터 수</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card shadow-sm border-0 rounded-4 bg-success text-white">
-            <div class="card-body">
-                <h6 class="fw-bold">Normal Records</h6>
-                <h3 class="fw-bold">{{ kpi.normal_cnt }}</h3>
-                <p class="mb-0 small">정상 데이터 수</p>
-            </div>
-        </div>
-    </div>
-
+<!-- 기준일자 선택 -->
+<div class="mb-3">
+    <label><b>Target Date</b></label>
+    <select id="dateFilter" class="form-select" style="width:200px;">
+        {% for d in date_list %}
+        <option value="/?date={{ d }}" {% if d == selected_date %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+    </select>
 </div>
 
 <hr class="my-4">
 
-<!-- 테이블 KPI -->
-<h4 class="fw-bold mb-3">📁 Table KPI</h4>
-<div class="row g-3">
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm">
-            <div class="card-body text-center">
-                <h6>검증 테이블수</h6>
-                <h2 class="fw-bold">{{ table_kpi.verified }}</h2>
-            </div>
-        </div>
-    </div>
+<!-- 1) 전체 KPI by DB Type -->
+<h4 class="fw-bold mb-3">🌐 Overall KPI by DB Type ({{ selected_date }})</h4>
 
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm border-danger">
-            <div class="card-body text-center text-danger">
-                <h6>오류 테이블</h6>
-                <h2 class="fw-bold">{{ table_kpi.error }}</h2>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm border-success">
-            <div class="card-body text-center text-success">
-                <h6>정상 테이블</h6>
-                <h2 class="fw-bold">{{ table_kpi.normal }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
+<table class="table table-bordered table-striped align-middle text-center">
+    <thead class="table-light">
+        <tr>
+            <th>DB Type</th>
+            <th>Total</th>
+            <th>Error</th>
+            <th>Normal</th>
+            <th>Error Rate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in overall_kpi %}
+        <tr>
+            <td><b>{{ row.db_type }}</b></td>
+            <td>{{ "{:,}".format(row.total_cnt) }}</td>
+            <td class="text-danger fw-bold">{{ "{:,}".format(row.error_cnt) }}</td>
+            <td class="text-success fw-bold">{{ "{:,}".format(row.normal_cnt) }}</td>
+            <td>{{ (row.error_cnt / row.total_cnt * 100) | round(2) if row.total_cnt > 0 else 0 }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 <hr class="my-4">
 
-<!-- 컬럼 KPI -->
-<h4 class="fw-bold mb-3">🔠 Column KPI</h4>
-<div class="row g-3">
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm">
-            <div class="card-body text-center">
-                <h6>검증 컬럼수</h6>
-                <h2 class="fw-bold">{{ column_kpi.verified }}</h2>
-            </div>
-        </div>
-    </div>
+<!-- 2) 품질지수 요약 표 -->
+<h4 class="fw-bold mb-3">🔎 품질 점검 결과 요약</h4>
 
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm border-danger">
-            <div class="card-body text-center text-danger">
-                <h6>오류 컬럼</h6>
-                <h2 class="fw-bold">{{ column_kpi.error }}</h2>
-            </div>
-        </div>
-    </div>
+<table class="table table-bordered table-sm text-center align-middle">
+    <thead class="table-light">
+        <tr>
+            <th></th>
+            <th>검증컬럼</th>
+            <th>오류컬럼</th>
+            <th>품질지수(%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td><b>전체</b></td><td>{{ kpi_all.verified }}</td><td class="text-danger">{{ kpi_all.error }}</td><td><b>{{ kpi_all.quality }}%</b></td></tr>
+        <tr><td>인스턴스(I)</td><td>{{ kpi_inst.verified }}</td><td class="text-danger">{{ kpi_inst.error }}</td><td>{{ kpi_inst.quality }}%</td></tr>
+        <tr><td>날짜(D)</td><td>{{ kpi_date.verified }}</td><td class="text-danger">{{ kpi_date.error }}</td><td>{{ kpi_date.quality }}%</td></tr>
+        <tr><td>목록(L)</td><td>{{ kpi_list.verified }}</td><td class="text-danger">{{ kpi_list.error }}</td><td>{{ kpi_list.quality }}%</td></tr>
+    </tbody>
+</table>
 
-    <div class="col-md-4">
-        <div class="card rounded-4 shadow-sm border-success">
-            <div class="card-body text-center text-success">
-                <h6>정상 컬럼</h6>
-                <h2 class="fw-bold">{{ column_kpi.normal }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
+<hr class="my-4">
 
-<p>📌 상세 보기는 왼쪽 메뉴의 **Table Detail** 을 선택하세요.</p>
+<!-- 3) 정비계획 등록률 -->
+<h4 class="fw-bold mb-3">🛠 정비계획 등록률 (최근 3개월)</h4>
 
+<table class="table table-bordered table-striped text-center align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>기준일자</th>
+            <th>대상건수</th>
+            <th>등록건수</th>
+            <th>정비가능</th>
+            <th>정비불가능</th>
+            <th>등록률(%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in maint_chart %}
+        <tr>
+            <td>{{ row.base_date }}</td>
+            <td>{{ row.target_cnt }}</td>
+            <td class="text-primary fw-bold">{{ row.registered_cnt }}</td>
+            <td class="text-success fw-bold">{{ row.maint_yes }}</td>
+            <td class="text-danger fw-bold">{{ row.maint_no }}</td>
+            <td><b>{{ row.rate }}%</b></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById("dateFilter").addEventListener("change", function(){
+    window.location.href = this.value;
+});
+</script>
 {% endblock %}

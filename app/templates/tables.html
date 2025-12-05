@@ -4,15 +4,26 @@
 <h2>📂 Table List</h2>
 <p>테이블 검색 / 페이징 / 정렬 / 클릭 상세 이동</p>
 
-<!-- APP Filter -->
-<div class="mb-3">
-    <label><b>App Code Filter</b></label>
-    <select id="appFilter" class="form-select" style="width:200px;">
-        <option value="">ALL</option>
-        <option value="FIN">FIN</option>
-        <option value="CRM">CRM</option>
-        <option value="INS">INS</option>
-    </select>
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label><b>기준일자</b></label>
+        <select id="dateFilter" class="form-select">
+            {% for d in date_list %}
+            <option value="{{ d }}" {% if selected_date == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>App Code</b></label>
+        <select id="appFilter" class="form-select">
+            <option value="">ALL</option>
+            {% for app in app_code_list %}
+            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>{{ app }}</option>
+            {% endfor %}
+        </select>
+    </div>
 </div>
 
 <table id="tableList" class="table table-bordered table-hover">
@@ -23,32 +34,21 @@
             <th>Error Count</th>
             <th>Normal Count</th>
             <th>Error Rate</th>
-            <th style="display:none;">Columns</th>   <!-- 🔥 hidden column -->
         </tr>
     </thead>
     <tbody>
-    {% for t in tables %}
+        {% for t in tables %}
         <tr>
-            <td>{{ t.app_code }}</td>
-            <td>{{ t.table_name }}</td>
-            <td>{{ t.error_cnt }}</td>
-            <td>{{ t.normal_cnt }}</td>
-            <td>{{ t.error_rate }}%</td>
-
-            <td style="display:none;">
-            {% if sample_columns.get(t.table_name) %}
-                {{ sample_columns[t.table_name] | map(attribute='column') | join(', ') }}
-            {% else %}
-                ""
-            {% endif %}
-            </td>
+            <td>{{ t["어플리케이션코드"] }}</td>
+            <td>{{ t["테이블명"] }}</td>
+            <td>{{ t["error_cnt"] }}</td>
+            <td>{{ t["normal_cnt"] }}</td>
+            <td>{{ t["error_rate"] }}%</td>
         </tr>
-    {% endfor %}
+        {% endfor %}
     </tbody>
-
 </table>
 
-<!-- DataTables CSS/JS -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -56,37 +56,30 @@
 <script>
 $(document).ready(function () {
 
-    // DataTable 초기화
     const table = $('#tableList').DataTable({
         pageLength: 50,
         ordering: true,
         searching: true,
         paging: true,
-        lengthChange: false,
-        columnDefs: [
-            { targets: [5], visible: false, searchable: true }  // hidden column index
-        ]
+        lengthChange: false
     });
 
-    // URL 파라미터(app) 기반 드롭다운/테이블 동기화
-    const selectedApp = "{{ selected_app }}";
-    if (selectedApp) {
-        $('#appFilter').val(selectedApp);
-        table.column(0).search('^' + selectedApp + '$', true, false).draw();
-    }
+    // Filter change → reload
+    $('#dateFilter, #appFilter').on('change', function () {
+        const date = $('#dateFilter').val();
+        const app  = $('#appFilter').val();
 
-    // Filter 이벤트 → URL 이동
-    $('#appFilter').on('change', function () {
-        const val = $(this).val();
-        let newUrl = "/tables";
-        if (val) newUrl = `/tables?app=${val}`;
+        let newUrl = `/tables?date=${date}`;
+        if (app) newUrl += `&app=${app}`;
+
         window.location.href = newUrl;
     });
 
-    // Row Click → Detail 이동
+    // Row click → detail
     $('#tableList').on('click', 'tbody tr', function () {
         const tableName = $(this).find('td:eq(1)').text();
-        window.location.href = `/detail/${tableName}`;
+        const date = $('#dateFilter').val();
+        window.location.href = `/detail/${tableName}?date=${date}`;
     });
 
 });

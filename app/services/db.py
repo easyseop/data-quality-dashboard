@@ -1,12 +1,11 @@
-import os
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
+import pymysql
+from pymysql.cursors import DictCursor
 
-load_dotenv()
-
-def get_engine():
-    db_url = (
-        f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-        f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+def get_connection():
+    return pymysql.connect(
+        host="mysql",         
+        user="dquser",
+        password="1234",
+        database="data_quality",
+        cursorclass=DictCursor
     )
-    return create_engine(db_url)
