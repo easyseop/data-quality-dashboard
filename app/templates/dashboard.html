@@ -1,7 +1,16 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<h2 class="mb-4">📊 Data Quality Dashboard</h2>
+<div class="d-flex justify-content-between align-items-center">
+    <h2 class="mb-4">📊 Data Quality Dashboard</h2>
+
+    <!-- 다운로드 버튼 -->
+    <div class="d-flex justify-content-end mb-3">
+        <a href="/download/summary?date={{ selected_date }}" class="btn btn-success">
+            📥 통계정보 상세 다운로드
+        </a>
+    </div>
+</div>
 
 <!-- 기준일자 선택 -->
 <div class="mb-3">

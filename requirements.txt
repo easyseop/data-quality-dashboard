@@ -2,3 +2,5 @@ flask==2.2.3
 gunicorn==21.2.0
 pymysql==1.1.0
 Werkzeug==2.2.3
+pandas==1.5.3
+openpyxl==3.0.10

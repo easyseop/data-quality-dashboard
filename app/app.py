@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask,send_file ,render_template, request, jsonify
 from sample_data import sample_tables, sample_columns, sample_column_detail
 from collections import defaultdict
 from services.db import get_connection
+import pandas as pd
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -111,6 +113,61 @@ def dashboard():
     )
 
 
+# ===================== summary download ( / ) ===================== #
+
+@app.route("/download/summary", methods=["GET"])
+def download_summary():
+    # 최신 기준일자 또는 선택 기준일자
+    target_date = request.args.get("date", None)
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # ---- 1) SUMMARY 데이터 조회 ----
+    cur.execute("""
+        SELECT base_date, db_type,
+               inst_err_cnt, list_err_cnt, ymd_err_cnt,
+               inst_pass_cnt, list_pass_cnt, ymd_pass_cnt
+        FROM DQ_SUMMARY_REPORT
+        WHERE base_date = %s
+        ORDER BY db_type
+    """, (target_date,))
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    # DataFrame 변환
+    df = pd.DataFrame(rows)
+
+    # ---- 2) 신규 집계 컬럼 추가 ----
+    df["total_err"] = df["inst_err_cnt"] + df["list_err_cnt"] + df["ymd_err_cnt"]
+    df["total_pass"] = df["inst_pass_cnt"] + df["list_pass_cnt"] + df["ymd_pass_cnt"]
+    df["total"] = df["total_err"] + df["total_pass"]
+    df["quality_rate(%)"] = round(df["total_pass"] / df["total"] * 100, 2)
+
+    # ---- 3) 엑셀 생성 ----
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=f"Summary_{target_date}")
+
+        # 📌 추후 지표 확장 가이드
+        # - 신규 지표가 추가될 경우:
+        #   1) SELECT SQL에 신규 컬럼 추가
+        #   2) df["column_name"] = 계산식 or raw value
+        #   3) df.to_excel() 그대로 실행하면 반영 완료됨
+
+    output.seek(0)
+
+    filename = f"DataQuality_Summary_{target_date}.xlsx"
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
 # ===================== Trend Main ===================== #
 @app.route("/trend")
 def trend():
@@ -123,6 +180,9 @@ def trend_view():
     page = int(request.args.get("page", 1))
     per_page = 10
     selected_app = request.args.get("app", "ALL")
+    selected_etype = request.args.get("etype", "ALL")
+
+    
 
     conn = get_connection()
     cur = conn.cursor()
@@ -208,6 +268,13 @@ def trend_view():
 
         rows.append({**r, "seq": seq, "error_type": error_type})
 
+
+        # ----- 오류유형 필터 적용 -----
+    if selected_etype == "NEW":
+        rows = [r for r in rows if r["error_type"] == "신규오류"]
+    elif selected_etype == "SEQ":
+        rows = [r for r in rows if r["error_type"] != "신규오류"]
+
     rows = sorted(rows, key=lambda x: (x["seq"], x["error_type"] == "신규오류"), reverse=True)
 
     # Paging
@@ -224,12 +291,103 @@ def trend_view():
         date_list=date_list,
         selected_base=selected_base,
         selected_app=selected_app,
-        total_pages=total_pages,
-        page=page,
+        selected_etype=selected_etype,
         d1=d1, d2=d2, d3=d3,
+        page=page, total_pages=total_pages,
+        total_count=total,
+        per_page=per_page,
         app_list=app_list
     )
 
+
+
+
+@app.route("/owner")
+def owner_view():
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    selected_app = request.args.get("app", "ALL")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT 기준년월일
+        FROM DQ_MF_ASSERTION_LIST
+        ORDER BY 기준년월일 DESC
+    """)
+    
+    date_list = [row["기준년월일"] for row in cur.fetchall()]
+
+    # ---- 2) 선택 기준일 처리 ----
+    selected_date = request.args.get("date", date_list[0])
+
+    # AppCode 목록
+    cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
+    app_list = [row["어플리케이션코드"] for row in cur.fetchall()]
+
+    # 연속오류 SQL
+    app_sql = "" if selected_app == "ALL" else f"AND A.어플리케이션코드='{selected_app}'"
+
+    # ---- 3) 오류 APP + 담당자 조회 ----
+    sql = f"""
+        WITH err AS (
+            SELECT A.어플리케이션코드 AS app_code,
+                   COUNT(*) AS error_cols
+            FROM DQ_MF_ASSERTION_LIST A
+            JOIN (
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_INST_RESULT
+                UNION ALL
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_DATE_RESULT
+                UNION ALL
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_LIST_RESULT
+            ) R
+            ON A.기준년월일 = R.기준년월일
+            AND A.서버코드 = R.서버코드
+            AND A.테이블명 = R.테이블명
+            AND A.컬럼명   = R.컬럼명
+            WHERE R.오류여부='Y'
+              AND R.기준년월일='{selected_date}'
+              {app_sql}
+            GROUP BY A.어플리케이션코드
+        )
+        SELECT e.app_code, e.error_cols,
+               M.user_nm, M.user_id, M.org_nm, M.brn_nm
+        FROM err e
+        LEFT JOIN DQ_TBL_MANAGER_INFO M
+        ON e.app_code = M.app_code
+        ORDER BY e.error_cols DESC, M.user_nm
+    """
+
+    cur.execute(sql)
+    result = cur.fetchall()
+
+    # ---- 4) rownum 부여 + 페이징 ----
+    total = len(result)
+    total_pages = (total + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = page * per_page
+    sliced = result[start:end]
+
+    rows = []
+    for idx, r in enumerate(sliced, start=start + 1):
+        rows.append({
+            "rownum": idx,
+            **r
+        })
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "owner.html",
+        rows=rows,
+        date_list=date_list,
+        selected_date=selected_date,
+        page=page,
+        total_pages=total_pages,
+        app_list = app_list
+    )
 
 
 # ===================== 2) Tables ( /tables ) ===================== #

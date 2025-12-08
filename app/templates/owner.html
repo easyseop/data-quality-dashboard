@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2 class="mb-4">👨‍💼 오류 담당자 현황</h2>
+
+<form method="get" action="/owner" class="row mb-3">
+    <div class="col-md-3">
+        <label><b>기준년월일</b></label>
+        <select name="date" class="form-select" onchange="this.form.submit()">
+            {% for d in date_list %}
+            <option value="{{ d }}" {% if d == selected_date %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label><b>AppCode 필터</b></label>
+        <select name="app" class="form-select" onchange="this.form.submit()">
+            <option value="ALL" {% if selected_app == "ALL" %}selected{% endif %}>ALL</option>
+            {% for app in app_list %}
+            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>{{ app }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+</form>
+
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th style="width:70px;">No</th>
+            <th>App</th>
+            <th>오류컬럼수</th>
+            <th>담당자명</th>
+            <th>User ID</th>
+            <th>조직명</th>
+            <th>점포명</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+        <td>{{ r.rownum }}</td>
+        <td>{{ r.app_code }}</td>
+        <td class="text-danger fw-bold">{{ r.error_cols }}</td>
+        <td>{{ r.user_nm or "-" }}</td>
+        <td>{{ r.user_id or "-" }}</td>
+        <td>{{ r.org_nm or "-" }}</td>
+        <td>{{ r.brn_nm or "-" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<nav>
+    <ul class="pagination justify-content-center">
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link"
+               href="?page={{ p }}&date={{ selected_date }}">
+               {{ p }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+
+{% endblock %}

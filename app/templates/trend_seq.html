@@ -7,6 +7,7 @@
 가장 최근 기준년월일에 <b>오류(Y)</b>였던 컬럼만 대상으로 연속 오류 여부를 분석하였습니다.
 </p>
 
+<!-- Filters -->
 <form method="get" action="/trend/seq" class="row mb-3">
     <div class="col-md-3">
         <label><b>기준 기준년월일</b></label>
@@ -26,11 +27,23 @@
             {% endfor %}
         </select>
     </div>
+
+    <div class="col-md-3">
+        <label><b>오류유형 필터</b></label>
+        <select name="etype" class="form-select" onchange="this.form.submit()">
+            <option value="ALL" {% if selected_etype == "ALL" %}selected{% endif %}>ALL</option>
+            <option value="NEW" {% if selected_etype == "NEW" %}selected{% endif %}>신규오류</option>
+            <option value="SEQ" {% if selected_etype == "SEQ" %}selected{% endif %}>연속오류</option>
+        </select>
+    </div>
+
 </form>
 
+<!-- Result Table -->
 <table class="table table-bordered table-hover align-middle">
     <thead class="table-light">
         <tr>
+            <th>No</th>
             <th>App</th>
             <th>Table</th>
             <th>Column</th>
@@ -43,6 +56,7 @@
     <tbody>
     {% for r in rows %}
         <tr>
+            <td>{{ loop.index + ((page-1) * per_page) }}</td>
             <td>{{ r.app_code }}</td>
             <td>{{ r.table_name }}</td>
             <td>{{ r.column_name }}</td>
@@ -61,11 +75,15 @@
     </tbody>
 </table>
 
+<!-- Pagination -->
 <nav>
     <ul class="pagination justify-content-center">
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="?page={{ p }}&base={{ selected_base }}&app={{ selected_app }}">{{ p }}</a>
+            <a class="page-link"
+                href="?page={{ p }}&base={{ selected_base }}&app={{ selected_app }}&etype={{ selected_etype }}">
+                {{ p }}
+            </a>
         </li>
         {% endfor %}
     </ul>
