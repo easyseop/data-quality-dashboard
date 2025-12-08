@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2 class="mb-4">📈 연속 오류 여부 분석</h2>
+
+<p class="text-muted small">
+가장 최근 기준년월일에 <b>오류(Y)</b>였던 컬럼만 대상으로 연속 오류 여부를 분석하였습니다.
+</p>
+
+<form method="get" action="/trend/seq" class="row mb-3">
+    <div class="col-md-3">
+        <label><b>기준 기준년월일</b></label>
+        <select name="base" class="form-select" onchange="this.form.submit()">
+            {% for d in date_list %}
+            <option value="{{ d }}" {% if d == selected_base %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label><b>AppCode 필터</b></label>
+        <select name="app" class="form-select" onchange="this.form.submit()">
+            <option value="ALL" {% if selected_app == "ALL" %}selected{% endif %}>ALL</option>
+            {% for app in app_list %}
+            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>{{ app }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</form>
+
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>App</th>
+            <th>Table</th>
+            <th>Column</th>
+            <th>{{ d1 }}</th>
+            <th>{{ d2 if d2 else "-" }}</th>
+            <th>{{ d3 if d3 else "-" }}</th>
+            <th>연속오류여부</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+        <tr>
+            <td>{{ r.app_code }}</td>
+            <td>{{ r.table_name }}</td>
+            <td>{{ r.column_name }}</td>
+            <td>{{ r.d1 or "-" }}</td>
+            <td>{{ r.d2 or "-" }}</td>
+            <td>{{ r.d3 or "-" }}</td>
+            <td>
+                {% if r.error_type == "신규오류" %}
+                    <span class="badge bg-primary">신규</span>
+                {% else %}
+                    <span class="badge bg-danger">{{ r.seq }}연속</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<nav>
+    <ul class="pagination justify-content-center">
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&base={{ selected_base }}&app={{ selected_app }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+
+{% endblock %}

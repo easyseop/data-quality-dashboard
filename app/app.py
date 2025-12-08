@@ -111,12 +111,125 @@ def dashboard():
     )
 
 
-
-
-# ===================== Trend ( /trend ) - 준비용 ===================== #
+# ===================== Trend Main ===================== #
 @app.route("/trend")
 def trend():
     return render_template("trend.html")
+
+
+# =====================  /trend/seq 연속오류 분석  ===================== #
+@app.route("/trend/seq")
+def trend_view():
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    selected_app = request.args.get("app", "ALL")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # 기준년월일 목록 (최신일자 목록)
+    cur.execute("""
+        SELECT DISTINCT 기준년월일
+        FROM DQ_MF_ASSERTION_LIST
+        ORDER BY 기준년월일 DESC
+    """)
+    date_list = [row["기준년월일"] for row in cur.fetchall()]
+
+    # 선택 기준일
+    selected_base = request.args.get("base", date_list[0])
+
+    # 선택 기준일 기준으로 d1,d2,d3 추출
+    base_index = date_list.index(selected_base)
+    d1 = date_list[base_index]
+    d2 = date_list[base_index + 1] if base_index + 1 < len(date_list) else None
+    d3 = date_list[base_index + 2] if base_index + 2 < len(date_list) else None
+
+    # AppCode 목록
+    cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
+    app_list = [row["어플리케이션코드"] for row in cur.fetchall()]
+
+    # 연속오류 SQL
+    app_sql = "" if selected_app == "ALL" else f"AND A.어플리케이션코드='{selected_app}'"
+
+    sql = f"""
+        WITH recent_only AS (
+            SELECT A.어플리케이션코드 AS app_code, A.테이블명 AS table_name, A.컬럼명 AS column_name
+            FROM DQ_MF_ASSERTION_LIST A
+            JOIN (
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_INST_RESULT
+                UNION ALL
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_DATE_RESULT
+                UNION ALL
+                SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_LIST_RESULT
+            ) R
+            ON A.기준년월일 = R.기준년월일
+            AND A.서버코드 = R.서버코드
+            AND A.테이블명 = R.테이블명
+            AND A.컬럼명 = R.컬럼명
+            WHERE R.기준년월일='{d1}' AND R.오류여부='Y'
+            {app_sql}
+        ),
+        merged AS (
+            SELECT 기준년월일, 테이블명, 컬럼명, 오류여부
+            FROM (
+                SELECT 기준년월일, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_INST_RESULT
+                UNION ALL
+                SELECT 기준년월일, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_DATE_RESULT
+                UNION ALL
+                SELECT 기준년월일, 테이블명, 컬럼명, 오류여부 FROM DQ_MF_LIST_RESULT
+            ) X
+            WHERE 기준년월일 IN ('{d1}' {f",'{d2}'" if d2 else ""} {f",'{d3}'" if d3 else ""})
+        )
+        SELECT r.app_code, r.table_name, r.column_name,
+            MAX(CASE WHEN m.기준년월일='{d1}' THEN m.오류여부 END) AS d1,
+            MAX(CASE WHEN m.기준년월일='{d2}' THEN m.오류여부 END) AS d2,
+            MAX(CASE WHEN m.기준년월일='{d3}' THEN m.오류여부 END) AS d3
+        FROM recent_only r
+        LEFT JOIN merged m
+        ON r.table_name=m.테이블명 AND r.column_name=m.컬럼명
+        GROUP BY r.app_code, r.table_name, r.column_name
+    """
+
+    cur.execute(sql)
+    result = cur.fetchall()
+
+    rows = []
+    for r in result:
+        seq = 1
+        if r["d1"] == "Y" and r["d2"] == "Y":
+            seq = 2
+            if r["d3"] == "Y":
+                seq = 3
+
+        if seq == 1 and (r["d2"] != "Y"):
+            error_type = "신규오류"
+        else:
+            error_type = "연속오류"
+
+        rows.append({**r, "seq": seq, "error_type": error_type})
+
+    rows = sorted(rows, key=lambda x: (x["seq"], x["error_type"] == "신규오류"), reverse=True)
+
+    # Paging
+    total = len(rows)
+    total_pages = (total + per_page - 1) // per_page
+    rows = rows[(page - 1) * per_page : page * per_page]
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "trend_seq.html",
+        rows=rows,
+        date_list=date_list,
+        selected_base=selected_base,
+        selected_app=selected_app,
+        total_pages=total_pages,
+        page=page,
+        d1=d1, d2=d2, d3=d3,
+        app_list=app_list
+    )
+
 
 
 # ===================== 2) Tables ( /tables ) ===================== #
