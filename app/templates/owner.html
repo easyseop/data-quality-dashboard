@@ -4,16 +4,38 @@
 <h2 class="mb-4">👨‍💼 오류 담당자 현황</h2>
 
 <form method="get" action="/owner" class="row mb-3">
+
     <div class="col-md-3">
-        <label><b>기준년월일</b></label>
-        <select name="date" class="form-select" onchange="this.form.submit()">
-            {% for d in date_list %}
-            <option value="{{ d.base }}" {% if d.base == selected_date %}selected{% endif %}>
-                {{ d.base[2:4] }}년 {{ d.cycle }} {{ d.type }} 검증
+        <label><b>년도</b></label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+                {{ y[:4] }}년
             </option>
             {% endfor %}
         </select>
+    </div>
 
+    <div class="col-md-3">
+        <label><b>검증구분</b></label>
+        <select name="dtype" class="form-select" onchange="this.form.submit()">
+            {% for t in dtype_list %}
+            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>
+                {{ t }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label><b>검증차수</b></label>
+        <select name="cycle" class="form-select" onchange="this.form.submit()">
+            {% for c in cycle_list %}
+            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>
+                {{ c }}
+            </option>
+            {% endfor %}
+        </select>
     </div>
 
     <div class="col-md-3">
@@ -52,6 +74,11 @@
         <td>{{ r.brn_nm or "-" }}</td>
     </tr>
     {% endfor %}
+    {% if rows|length == 0 %}
+    <tr>
+        <td colspan="7" class="text-muted text-center">해당 조건에 대한 오류 담당자 정보가 없습니다.</td>
+    </tr>
+    {% endif %}
     </tbody>
 </table>
 
@@ -60,7 +87,7 @@
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
             <a class="page-link"
-               href="?page={{ p }}&date={{ selected_date }}">
+               href="?page={{ p }}&year={{ selected_year }}&dtype={{ selected_dtype }}&cycle={{ selected_cycle }}&app={{ selected_app }}">
                {{ p }}
             </a>
         </li>

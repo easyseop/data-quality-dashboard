@@ -4,15 +4,30 @@
 <h2>📂 Table List</h2>
 <p>테이블 검색 / 페이징 / 정렬 / 클릭 상세 이동</p>
 
-<!-- Filters (form 제거) -->
 <div class="row mb-3">
-    <div class="col-md-3">
-        <label><b>기준 기준년월일</b></label>
-        <select id="dateFilter" class="form-select">
-            {% for d in date_list %}
-            <option value="{{ d['base'] }}" {% if d['base'] == selected_date %}selected{% endif %}>
-                {{ d['base'][2:4] }}년 {{ d['cycle'] }} {{ d['type'] }} 검증
-            </option>
+    <div class="col-md-2">
+        <label><b>년도</b></label>
+        <select id="yearFilter" class="form-select">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}년</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>검증구분</b></label>
+        <select id="dtypeFilter" class="form-select">
+            {% for t in dtype_list %}
+            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>차수</b></label>
+        <select id="cycleFilter" class="form-select">
+            {% for c in cycle_list %}
+            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>{{ c }}</option>
             {% endfor %}
         </select>
     </div>
@@ -20,7 +35,7 @@
     <div class="col-md-2">
         <label><b>App Code</b></label>
         <select id="appFilter" class="form-select">
-            <option value="">ALL</option>
+            <option value="ALL" {% if selected_app == "ALL" %}selected{% endif %}>ALL</option>
             {% for app in app_code_list %}
             <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>{{ app }}</option>
             {% endfor %}
@@ -57,32 +72,34 @@
 
 <script>
 $(document).ready(function () {
-    
+
+
     const table = $('#tableList').DataTable({
-    pageLength: 50,
-    ordering: true,         // 정렬 활성화
-    order: [[4, 'desc']],   // 정렬 기준 (4번째 컬럼: Error Rate)
-    searching: false,
-    paging: true,
-    deferRender: true,
-    stateSave: true,        // 마지막 정렬 상태 기억
-    lengthChange: false
+        pageLength: 50,
+        ordering: true,
+        order: [[2, 'asc']],
+        searching: false,
+        paging: true,
+        deferRender: true,
+        stateSave: false,    // 🔧 저장 기능 비활성화
+        lengthChange: false
     });
 
-    $('#dateFilter, #appFilter').on('change', function () {
-        const date = $('#dateFilter').val();
-        const app  = $('#appFilter').val();
+    $("#yearFilter, #dtypeFilter, #cycleFilter, #appFilter").on("change", function () {
+        const year  = $("#yearFilter").val();
+        const dtype = $("#dtypeFilter").val();
+        const cycle = $("#cycleFilter").val();
+        const app   = $("#appFilter").val();
 
-        let newUrl = `/tables?date=${date}`;
+        let newUrl = `/tables?year=${year}&dtype=${dtype}&cycle=${cycle}`;
         if (app) newUrl += `&app=${app}`;
 
         window.location.href = newUrl;
     });
 
-    $('#tableList').on('click', 'tbody tr', function () {
-        const tableName = $(this).find('td:eq(1)').text();
-        const date = $('#dateFilter').val();
-        window.location.href = `/detail/${tableName}?date=${date}`;
+    $("#tableList").on("click", "tbody tr", function () {
+        const tableName = $(this).find("td:eq(1)").text();
+        window.location.href = `/detail/${tableName}?date={{ selected_base }}`;
     });
 
 });

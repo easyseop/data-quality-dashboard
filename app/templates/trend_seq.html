@@ -4,21 +4,37 @@
 <h2 class="mb-4">📈 연속 오류 여부 분석</h2>
 
 <p class="text-muted small">
-가장 최근 기준년월일에 <b>오류(Y)</b>였던 컬럼만 대상으로 연속 오류 여부를 분석하였습니다.
+최근 기준년월일에 오류(Y) 발생한 컬럼 대상 / 연속 오류 추적
 </p>
 
 <!-- Filters -->
 <form method="get" action="/trend/seq" class="row mb-3">
-    <div class="col-md-3">
-        <label><b>기준 기준년월일</b></label>
-        <select name="base" class="form-select" onchange="this.form.submit()">
-            {% for d in date_list %}
-            <option value="{{ d.base }}" {% if d.base == selected_base %}selected{% endif %}>
-                {{ d.base[2:4] }}년 {{ d.cycle }} {{ d.type }} 검증
-            </option>
+
+    <div class="col-md-2">
+        <label><b>년도</b></label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}년</option>
             {% endfor %}
         </select>
+    </div>
 
+    <div class="col-md-2">
+        <label><b>검증구분</b></label>
+        <select name="dtype" class="form-select" onchange="this.form.submit()">
+            {% for t in dtype_list %}
+            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>차수</b></label>
+        <select name="cycle" class="form-select" onchange="this.form.submit()">
+            {% for c in cycle_list %}
+            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
     </div>
 
     <div class="col-md-3">
@@ -42,7 +58,7 @@
 
 </form>
 
-<!-- Result Table -->
+
 <table class="table table-bordered table-hover align-middle">
     <thead class="table-light">
         <tr>
@@ -53,7 +69,7 @@
             <th>{{ d1 }}</th>
             <th>{{ d2 if d2 else "-" }}</th>
             <th>{{ d3 if d3 else "-" }}</th>
-            <th>연속오류여부</th>
+            <th>오류유형</th>
         </tr>
     </thead>
     <tbody>
@@ -78,14 +94,13 @@
     </tbody>
 </table>
 
-<!-- Pagination -->
 <nav>
     <ul class="pagination justify-content-center">
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
             <a class="page-link"
-                href="?page={{ p }}&base={{ selected_base }}&app={{ selected_app }}&etype={{ selected_etype }}">
-                {{ p }}
+               href="?page={{ p }}&year={{ selected_year }}&dtype={{ selected_dtype }}&cycle={{ selected_cycle }}&app={{ selected_app }}&etype={{ selected_etype }}">
+               {{ p }}
             </a>
         </li>
         {% endfor %}

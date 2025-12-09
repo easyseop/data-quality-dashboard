@@ -6,28 +6,56 @@
 
     <!-- 다운로드 버튼 -->
     <div class="d-flex justify-content-end mb-3">
-        <a href="/download/summary?date={{ selected_date }}" class="btn btn-success">
+        <a href="/download/summary?date={{ selected_base }}" class="btn btn-success">
             📥 통계정보 상세 다운로드
         </a>
     </div>
 </div>
 
-<!-- 기준일자 + 검증차수 + 검증구분 선택 -->
-<div class="mb-3">
-    <label><b>Target Date</b></label>
-    <select id="dateFilter" class="form-select" style="width:260px;">
-        {% for d in date_list %}
-        <option value="/?date={{ d.base }}" {% if d.base == selected_date %}selected{% endif %}>
-            {{ d['base'][2:4] }}년 {{ d['cycle'] }} {{ d['type'] }} 검증
-        </option>
-        {% endfor %}
-    </select>
-</div>
+<!-- 필터: 년도 / 검증구분 / 차수 -->
+<form method="get" action="/" class="row mb-3">
+
+    <div class="col-md-2">
+        <label><b>년도</b></label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+                {{ y }}년
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>검증구분</b></label>
+        <select name="dtype" class="form-select" onchange="this.form.submit()">
+            {% for t in dtype_list %}
+            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>
+                {{ t }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>차수</b></label>
+        <select name="cycle" class="form-select" onchange="this.form.submit()">
+            {% for c in cycle_list %}
+            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>
+                {{ c }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+</form>
 
 <hr class="my-4">
 
 <!-- 1) 전체 KPI by DB Type -->
-<h4 class="fw-bold mb-3">🌐 Overall KPI by DB Type ({{ selected_date }})</h4>
+<h4 class="fw-bold mb-3">
+    🌐 Overall KPI by DB Type ({{ selected_year[2:4] }}년 {{ selected_cycle }} {{ selected_dtype }} 검증)
+</h4>
 
 <table class="table table-bordered table-striped align-middle text-center">
     <thead class="table-light">
@@ -49,6 +77,11 @@
             <td>{{ (row.error_cnt / row.total_cnt * 100) | round(2) if row.total_cnt > 0 else 0 }}%</td>
         </tr>
         {% endfor %}
+        {% if overall_kpi|length == 0 %}
+        <tr>
+            <td colspan="5" class="text-muted">해당 조건에 대한 Summary 데이터가 없습니다.</td>
+        </tr>
+        {% endif %}
     </tbody>
 </table>
 
@@ -67,10 +100,30 @@
         </tr>
     </thead>
     <tbody>
-        <tr><td><b>전체</b></td><td>{{ kpi_all.verified }}</td><td class="text-danger">{{ kpi_all.error }}</td><td><b>{{ kpi_all.quality }}%</b></td></tr>
-        <tr><td>인스턴스(I)</td><td>{{ kpi_inst.verified }}</td><td class="text-danger">{{ kpi_inst.error }}</td><td>{{ kpi_inst.quality }}%</td></tr>
-        <tr><td>날짜(D)</td><td>{{ kpi_date.verified }}</td><td class="text-danger">{{ kpi_date.error }}</td><td>{{ kpi_date.quality }}%</td></tr>
-        <tr><td>목록(L)</td><td>{{ kpi_list.verified }}</td><td class="text-danger">{{ kpi_list.error }}</td><td>{{ kpi_list.quality }}%</td></tr>
+        <tr>
+            <td><b>전체</b></td>
+            <td>{{ kpi_all.verified or 0 }}</td>
+            <td class="text-danger">{{ kpi_all.error or 0 }}</td>
+            <td><b>{{ kpi_all.quality or 0 }}%</b></td>
+        </tr>
+        <tr>
+            <td>인스턴스(I)</td>
+            <td>{{ kpi_inst.verified }}</td>
+            <td class="text-danger">{{ kpi_inst.error }}</td>
+            <td>{{ kpi_inst.quality }}%</td>
+        </tr>
+        <tr>
+            <td>날짜(D)</td>
+            <td>{{ kpi_date.verified }}</td>
+            <td class="text-danger">{{ kpi_date.error }}</td>
+            <td>{{ kpi_date.quality }}%</td>
+        </tr>
+        <tr>
+            <td>목록(L)</td>
+            <td>{{ kpi_list.verified }}</td>
+            <td class="text-danger">{{ kpi_list.error }}</td>
+            <td>{{ kpi_list.quality }}%</td>
+        </tr>
     </tbody>
 </table>
 
@@ -101,15 +154,12 @@
             <td><b>{{ row.rate }}%</b></td>
         </tr>
         {% endfor %}
+        {% if maint_chart|length == 0 %}
+        <tr>
+            <td colspan="6" class="text-muted">정비계획 데이터가 없습니다.</td>
+        </tr>
+        {% endif %}
     </tbody>
 </table>
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.getElementById("dateFilter").addEventListener("change", function(){
-    window.location.href = this.value;
-});
-</script>
 {% endblock %}

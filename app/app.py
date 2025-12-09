@@ -17,29 +17,78 @@ def dashboard():
 
     # ---- 기준년도 + 검증차수 + 검증구분 조회 ----
     cur.execute("""
-    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
-    FROM DQ_BASE_DATE_INFO
-    ORDER BY 기준년월일 DESC;
+        SELECT DISTINCT 기준년월일, 검증차수, 검증구분
+        FROM DQ_BASE_DATE_INFO
+        ORDER BY 기준년월일 DESC;
     """)
-    rows = cur.fetchall()
-    print("==== DEBUG rows ====")
-    print(rows)
+    raw = cur.fetchall()
 
+    if not raw:
+        conn.close()
+        return "DQ_BASE_DATE_INFO 기준 정보가 없습니다."
+
+    # 기준 데이터 가공
     date_list = [
-    {
-        "base": r["기준년월일"],
-        "cycle": r["검증차수"],
-        "type": r["검증구분"]
-    }
-    for r in rows
+        {
+            "base": r["기준년월일"],           # 예: 20250301
+            "year": r["기준년월일"][:4],      # 예: 2025
+            "cycle": r["검증차수"],           # 예: 상반기 / 하반기 / 1월 ...
+            "type": r["검증구분"]            # 예: 정기 / 수시
+        }
+        for r in raw
     ]
 
+    # ===== 필터 리스트 생성 =====
+    year_list = sorted({d["year"] for d in date_list}, reverse=True)
+    dtype_list = sorted({d["type"] for d in date_list})  # 현재는 ['정기']만 있을 수 있음
 
+    # ---- 요청 파라미터 수신 ----
+    selected_year = request.args.get("year")
+    selected_dtype = request.args.get("dtype")
+    selected_cycle = request.args.get("cycle")
 
-    # 선택된 기준년월일
-    selected_date = request.args.get("date") or date_list[0]["base"]
+    # ---- 년도 보정 ----
+    if not selected_year or selected_year not in year_list:
+        selected_year = year_list[0]
 
-    # ---- 이하 기존 코드 그대로 ----
+    # ---- 검증구분 보정 ----
+    if not selected_dtype or selected_dtype not in dtype_list:
+        selected_dtype = dtype_list[0]
+
+    # ---- 선택된 year + type 기준으로 cycle 목록 생성 ----
+    cycle_list = sorted({
+        d["cycle"]
+        for d in date_list
+        if d["year"] == selected_year and d["type"] == selected_dtype
+    }, reverse = True)
+
+    # ---- cycle 보정 ----
+    if not cycle_list:
+        # 이 조합(년도+검증구분)에 해당하는 데이터 자체가 없음
+        selected_cycle = None
+    else:
+        if not selected_cycle or selected_cycle not in cycle_list:
+            # URL에 이전 년도의 상반기 같은 값이 남아있으면
+            # 현재 year/type에 맞는 첫 번째 값으로 보정
+            selected_cycle = cycle_list[0]
+
+    # ---- base_date 결정 ----
+    selected_base = None
+    if selected_cycle is not None:
+        for d in date_list:
+            if (
+                d["year"] == selected_year
+                and d["type"] == selected_dtype
+                and d["cycle"] == selected_cycle
+            ):
+                selected_base = d["base"]
+                break
+
+    # 최종 fallback (이론상 여기 올 일 거의 없지만 방어적으로)
+    if not selected_base:
+        selected_base = date_list[0]["base"]
+
+    # ---- Summary KPI (MF / DW) ----
     summary_sql = """
         SELECT
             db_type,
@@ -50,9 +99,10 @@ def dashboard():
         FROM DQ_SUMMARY_REPORT
         WHERE base_date=%s;
     """
-    cur.execute(summary_sql, selected_date)
+    cur.execute(summary_sql, (selected_base,))
     overall_kpi = cur.fetchall()
 
+    # ---- 품질지수 KPI ----
     quality_sql = """
         SELECT diagtype,
                COUNT(*) AS verified,
@@ -66,30 +116,32 @@ def dashboard():
         ) T
         GROUP BY diagtype;
     """
-    cur.execute(quality_sql, (selected_date, selected_date, selected_date))
-    rows = cur.fetchall()
+    cur.execute(quality_sql, (selected_base, selected_base, selected_base))
+    qrows = cur.fetchall()
 
     kpi_inst = {"verified": 0, "error": 0, "quality": 0}
     kpi_date = {"verified": 0, "error": 0, "quality": 0}
     kpi_list = {"verified": 0, "error": 0, "quality": 0}
 
-    for r in rows:
-        v, e = r["verified"], r["error"]
+    for r in qrows:
+        v = r["verified"]
+        e = r["error"]
         q = round((v - e) / v * 100, 2) if v > 0 else 0
 
         if r["diagtype"] == "I":
-            kpi_inst.update({"verified": v, "error": e, "quality": q})
+            kpi_inst = {"verified": v, "error": e, "quality": q}
         elif r["diagtype"] == "D":
-            kpi_date.update({"verified": v, "error": e, "quality": q})
+            kpi_date = {"verified": v, "error": e, "quality": q}
         elif r["diagtype"] == "L":
-            kpi_list.update({"verified": v, "error": e, "quality": q})
+            kpi_list = {"verified": v, "error": e, "quality": q}
 
     total_verified = kpi_inst["verified"] + kpi_date["verified"] + kpi_list["verified"]
     total_error = kpi_inst["error"] + kpi_date["error"] + kpi_list["error"]
-    total_quality = round((total_verified - total_error) / total_verified * 100, 2) if total_verified > 0 else 0
+    total_quality = round((total_verified - total_error) / total_verified * 100, 2) if total_verified else 0
 
     kpi_all = {"verified": total_verified, "error": total_error, "quality": total_quality}
 
+    # ---- Maintenance 계획 ----
     maint_sql = """
         SELECT
             base_date,
@@ -110,8 +162,13 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
-        selected_date=selected_date,
-        date_list=date_list,
+        year_list=year_list,
+        dtype_list=dtype_list,
+        cycle_list=cycle_list,
+        selected_year=selected_year,
+        selected_dtype=selected_dtype,
+        selected_cycle=selected_cycle,
+        selected_base=selected_base,
         overall_kpi=overall_kpi,
         kpi_all=kpi_all,
         kpi_inst=kpi_inst,
@@ -191,47 +248,81 @@ def trend_view():
     selected_app = request.args.get("app", "ALL")
     selected_etype = request.args.get("etype", "ALL")
 
-    
-
     conn = get_connection()
     cur = conn.cursor()
 
-    # 기준년월일 목록 (최신일자 목록)
-    # 기준년월일 목록 (최신일자 목록)
+    # ===== 기준년월일 목록 =====
+    # ===== 필터용 기준일 데이터 불러오기 =====
     cur.execute("""
-    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
-    FROM DQ_BASE_DATE_INFO
-    ORDER BY 기준년월일 DESC
+        SELECT DISTINCT
+            기준년월일,
+            검증차수,
+            검증구분
+        FROM DQ_BASE_DATE_INFO
+        ORDER BY 기준년월일 DESC
     """)
-    rows = cur.fetchall()
+    raw_rows = cur.fetchall()
 
+    # 기준데이터 가공
     date_list = [
         {
             "base": r["기준년월일"],
+            "year": r["기준년월일"][:4],
             "cycle": r["검증차수"],
             "type": r["검증구분"]
         }
-        for r in rows
+        for r in raw_rows
     ]
 
-    # 선택 기준일
-    selected_base = request.args.get("base", date_list[0]["base"])
+    # ===== 필터 리스트 생성 =====
+    # DB에 존재하는 year만 추출
+    year_list = sorted({d["year"] for d in date_list}, reverse=True)
 
-    # base_index 구하기
-    base_index = next(i for i, d in enumerate(date_list) if d["base"] == selected_base)
+    # DB에 존재하는 type만 추출 (정기만 있으면 정기만 표시됨)
+    dtype_list = sorted({d["type"] for d in date_list})
 
-    d1 = date_list[base_index]["base"]
-    d2 = date_list[base_index + 1]["base"] if base_index + 1 < len(date_list) else None
-    d3 = date_list[base_index + 2]["base"] if base_index + 2 < len(date_list) else None
+    # 선택된 값
+    selected_year = request.args.get("year", year_list[0])
+    selected_dtype = request.args.get("dtype", dtype_list[0])
+
+    # DB 존재 데이터만 cycle을 가져옴
+    cycle_list = sorted({
+        d["cycle"] for d in date_list
+        if d["year"] == selected_year and d["type"] == selected_dtype
+    }, reverse = True)
+
+    selected_cycle = request.args.get("cycle", cycle_list[0] if cycle_list else None)
 
 
-    # AppCode 목록
+
+    # base_date 결정 (없는 조합이면 기본값)
+    try:
+        selected_base = next(
+            d["base"] for d in date_list
+            if d["year"] == selected_year and d["type"] == selected_dtype and d["cycle"] == selected_cycle
+        )
+    except StopIteration:
+        selected_base = date_list[0]["base"]
+
+    # ===== D1 / D2 / D3 대상 base 목록 선정 =====
+    filtered_for_seq = sorted(
+        [d["base"] for d in date_list if d["type"] == selected_dtype],
+        reverse=True
+    )
+
+    d1 = selected_base
+    idx = filtered_for_seq.index(selected_base)
+    d2 = filtered_for_seq[idx + 1] if idx + 1 < len(filtered_for_seq) else None
+    d3 = filtered_for_seq[idx + 2] if idx + 2 < len(filtered_for_seq) else None
+
+    # ===== App 목록 =====
     cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
     app_list = [row["어플리케이션코드"] for row in cur.fetchall()]
 
-    # 연속오류 SQL
+    # SQL 필터 적용
     app_sql = "" if selected_app == "ALL" else f"AND A.어플리케이션코드='{selected_app}'"
 
+    ## 연속 오류 SQL ##
     sql = f"""
         WITH recent_only AS (
             SELECT A.어플리케이션코드 AS app_code, A.테이블명 AS table_name, A.컬럼명 AS column_name
@@ -273,7 +364,10 @@ def trend_view():
 
     cur.execute(sql)
     result = cur.fetchall()
+    cur.close()
+    conn.close()
 
+    # ===== seq & error type 설정 =====
     rows = []
     for r in result:
         seq = 1
@@ -282,15 +376,10 @@ def trend_view():
             if r["d3"] == "Y":
                 seq = 3
 
-        if seq == 1 and (r["d2"] != "Y"):
-            error_type = "신규오류"
-        else:
-            error_type = "연속오류"
-
+        error_type = "신규오류" if seq == 1 and r["d2"] != "Y" else "연속오류"
         rows.append({**r, "seq": seq, "error_type": error_type})
 
-
-        # ----- 오류유형 필터 적용 -----
+    # 필터
     if selected_etype == "NEW":
         rows = [r for r in rows if r["error_type"] == "신규오류"]
     elif selected_etype == "SEQ":
@@ -298,19 +387,38 @@ def trend_view():
 
     rows = sorted(rows, key=lambda x: (x["seq"], x["error_type"] == "신규오류"), reverse=True)
 
-    # Paging
     total = len(rows)
     total_pages = (total + per_page - 1) // per_page
     rows = rows[(page - 1) * per_page : page * per_page]
 
-    cur.close()
-    conn.close()
+    if not cycle_list:
+        return render_template(
+            "trend_seq.html",
+            rows=[],
+            year_list=year_list,
+            dtype_list=dtype_list,
+            cycle_list=cycle_list,
+            selected_year=selected_year,
+            selected_dtype=selected_dtype,
+            selected_cycle=None,
+            selected_app=selected_app,
+            selected_etype=selected_etype,
+            d1=None, d2=None, d3=None,
+            page=page, total_pages=1,
+            total_count=0,
+            per_page=per_page,
+            app_list=app_list
+        )
 
     return render_template(
         "trend_seq.html",
         rows=rows,
-        date_list=date_list,
-        selected_base=selected_base,
+        year_list=year_list,
+        dtype_list=dtype_list,
+        cycle_list=cycle_list,
+        selected_year=selected_year,
+        selected_dtype=selected_dtype,
+        selected_cycle=selected_cycle,
         selected_app=selected_app,
         selected_etype=selected_etype,
         d1=d1, d2=d2, d3=d3,
@@ -319,9 +427,6 @@ def trend_view():
         per_page=per_page,
         app_list=app_list
     )
-   
-
-
 
 
 @app.route("/owner")
@@ -333,35 +438,96 @@ def owner_view():
     conn = get_connection()
     cur = conn.cursor()
 
+    # 1) 기준일 + 검증차수 + 검증구분 (실제 오류 데이터가 있는 일자만)
     cur.execute("""
-    SELECT DISTINCT a.기준년월일, b.검증차수, b.검증구분
-    FROM DQ_MF_ASSERTION_LIST a
-    JOIN DQ_BASE_DATE_INFO b ON a.기준년월일 = b.기준년월일
-    ORDER BY a.기준년월일 DESC
+        SELECT DISTINCT a.기준년월일, b.검증차수, b.검증구분
+        FROM DQ_MF_ASSERTION_LIST a
+        JOIN DQ_BASE_DATE_INFO b
+          ON a.기준년월일 = b.기준년월일
+        ORDER BY a.기준년월일 DESC
     """)
+    raw = cur.fetchall()
 
-    rows = cur.fetchall()
+    if not raw:
+        conn.close()
+        return "오류 담당자 조회를 위한 기준일 정보가 없습니다."
 
     date_list = [
         {
-            "base": r["기준년월일"],
-            "cycle": r["검증차수"],
-            "type": r["검증구분"]
+            "base": r["기준년월일"],           # 20250301
+            "year": r["기준년월일"][:4],      # 2025
+            "cycle": r["검증차수"],           # 상반기/하반기/…(수시)
+            "type": r["검증구분"]            # 정기/수시
         }
-        for r in rows
+        for r in raw
     ]
 
-    selected_date = request.args.get("date", date_list[0]["base"])
+    # 2) 필터 리스트 생성
+    year_list = sorted({d["year"] for d in date_list}, reverse=True)
 
+    # ---- 요청 파라미터 읽기 ----
+    selected_year = request.args.get("year")
+    selected_dtype = request.args.get("dtype")
+    selected_cycle = request.args.get("cycle")
 
-    # AppCode 목록
-    cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
+    # ---- 년도 보정 ----
+    if not selected_year or selected_year not in year_list:
+        selected_year = year_list[0]
+
+    # ---- 검증구분 리스트 (해당 연도에 존재하는 구분만) ----
+    dtype_list = sorted({d["type"] for d in date_list if d["year"] == selected_year})
+    if not dtype_list:
+        # 방어적: 그래도 없으면 전체에서 뽑기
+        dtype_list = sorted({d["type"] for d in date_list})
+
+    # ---- 검증구분 보정 ----
+    if not selected_dtype or selected_dtype not in dtype_list:
+        selected_dtype = dtype_list[0]
+
+    # ---- 차수 리스트 (해당 연도 + 검증구분에서 실제 존재하는 값만) ----
+    cycle_list = sorted({
+        d["cycle"]
+        for d in date_list
+        if d["year"] == selected_year and d["type"] == selected_dtype
+    }, reverse = True)
+
+    # ---- 차수 보정 ----
+    if not cycle_list:
+        selected_cycle = None
+    else:
+        if not selected_cycle or selected_cycle not in cycle_list:
+            # ⭐ 여기서 "25년 상반기 → 24년" 바꿀 때 상반기가 남아있으면
+            #    24년에 맞는 첫 번째 차수(예: 하반기)로 자동 보정
+            selected_cycle = cycle_list[0]
+
+    # ---- 최종 기준일(base) 결정 ----
+    selected_date = None
+    if selected_cycle:
+        for d in date_list:
+            if (
+                d["year"] == selected_year
+                and d["type"] == selected_dtype
+                and d["cycle"] == selected_cycle
+            ):
+                selected_date = d["base"]
+                break
+
+    if not selected_date:
+        # 방어적으로 첫 행 사용
+        selected_date = date_list[0]["base"]
+
+    # 3) AppCode 목록 (선택된 기준일 기준)
+    cur.execute("""
+        SELECT DISTINCT 어플리케이션코드
+        FROM DQ_MF_ASSERTION_LIST
+        WHERE 기준년월일 = %s
+        ORDER BY 어플리케이션코드
+    """, (selected_date,))
     app_list = [row["어플리케이션코드"] for row in cur.fetchall()]
 
-    # 연속오류 SQL
+    # 4) 오류 APP + 담당자 조회
     app_sql = "" if selected_app == "ALL" else f"AND A.어플리케이션코드='{selected_app}'"
 
-    # ---- 3) 오류 APP + 담당자 조회 ----
     sql = f"""
         WITH err AS (
             SELECT A.어플리케이션코드 AS app_code,
@@ -394,16 +560,16 @@ def owner_view():
     cur.execute(sql)
     result = cur.fetchall()
 
-    # ---- 4) rownum 부여 + 페이징 ----
+    # 5) 페이징
     total = len(result)
     total_pages = (total + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = page * per_page
     sliced = result[start:end]
 
-    rows = []
+    rows_view = []
     for idx, r in enumerate(sliced, start=start + 1):
-        rows.append({
+        rows_view.append({
             "rownum": idx,
             **r
         })
@@ -413,43 +579,87 @@ def owner_view():
 
     return render_template(
         "owner.html",
-        rows=rows,
-        date_list=date_list,
-        selected_date=selected_date,
+        rows=rows_view,
+        year_list=year_list,
+        dtype_list=dtype_list,
+        cycle_list=cycle_list,
+        selected_year=selected_year,
+        selected_dtype=selected_dtype,
+        selected_cycle=selected_cycle,
+        selected_app=selected_app,
+        app_list=app_list,
         page=page,
         total_pages=total_pages,
-        app_list = app_list
+        selected_date=selected_date  # 필요하면 화면에 표시용
     )
+
 
 
 # ===================== 2) Tables ( /tables ) ===================== #
 @app.route("/tables")
 def tables_view():
-    target_date = request.args.get("date")
-    app_code = request.args.get("app")
+    app_code = request.args.get("app", "ALL")
 
     conn = get_connection()
-    cur = conn.cursor()   # ★ dictionary=True 절대 사용 X
+    cur = conn.cursor()
 
-
-    # ===== date list =====
+    # ===== date base info =====
     cur.execute("""
-    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
-    FROM DQ_BASE_DATE_INFO
-    ORDER BY 기준년월일 DESC
+        SELECT DISTINCT 기준년월일, 검증차수, 검증구분
+        FROM DQ_BASE_DATE_INFO
+        ORDER BY 기준년월일 DESC
     """)
-    rows_date = cur.fetchall()
+    raw = cur.fetchall()
 
     date_list = [
         {
             "base": r["기준년월일"],
+            "year": r["기준년월일"][:4],
             "cycle": r["검증차수"],
             "type": r["검증구분"]
         }
-        for r in rows_date
+        for r in raw
     ]
 
-    target_date = request.args.get("date") or date_list[0]["base"]
+    # ===== filter lists =====
+    year_list = sorted({d["year"] for d in date_list}, reverse=True)
+    dtype_list = sorted({d["type"] for d in date_list})
+
+    selected_year = request.args.get("year")
+    selected_dtype = request.args.get("dtype")
+    selected_cycle = request.args.get("cycle")
+
+    if not selected_year or selected_year not in year_list:
+        selected_year = year_list[0]
+
+    if not selected_dtype or selected_dtype not in dtype_list:
+        selected_dtype = dtype_list[0]
+
+    cycle_list = sorted({
+        d["cycle"]
+        for d in date_list
+        if d["year"] == selected_year and d["type"] == selected_dtype
+    }, reverse = True)
+
+    if not cycle_list:
+        selected_cycle = None
+    else:
+        if not selected_cycle or selected_cycle not in cycle_list:
+            selected_cycle = cycle_list[0]
+
+    # ===== base date 결정 =====
+    selected_base = None
+    for d in date_list:
+        if (
+            d["year"] == selected_year
+            and d["type"] == selected_dtype
+            and d["cycle"] == selected_cycle
+        ):
+            selected_base = d["base"]
+            break
+
+    if not selected_base:
+        selected_base = date_list[0]["base"]   # fallback
 
     # ===== app code list =====
     cur.execute("""
@@ -457,11 +667,11 @@ def tables_view():
         FROM DQ_MF_ASSERTION_LIST
         WHERE 기준년월일 = %s
         ORDER BY 어플리케이션코드
-        """, (target_date,))
+    """, (selected_base,))
     app_code_list = [row["어플리케이션코드"] for row in cur.fetchall()]
 
-    # ===== main summary query =====
-    params = [target_date, target_date, target_date, target_date]
+    # ===== table summary query =====
+    params = [selected_base, selected_base, selected_base, selected_base]
 
     summary_sql = """
     SELECT
@@ -491,7 +701,7 @@ def tables_view():
     AND A.제외여부 = 'N'
     """
 
-    if app_code:
+    if app_code and app_code != "ALL":
         summary_sql += " AND A.어플리케이션코드 = %s"
         params.append(app_code)
 
@@ -499,7 +709,6 @@ def tables_view():
     GROUP BY A.기준년월일, A.어플리케이션코드, A.테이블명
     ORDER BY error_rate DESC;
     """
-
 
     cur.execute(summary_sql, params)
     rows = cur.fetchall()
@@ -511,10 +720,15 @@ def tables_view():
         "tables.html",
         tables=rows,
         date_list=date_list,
+        year_list=year_list, dtype_list=dtype_list, cycle_list=cycle_list,
+        selected_year=selected_year,
+        selected_dtype=selected_dtype,
+        selected_cycle=selected_cycle,
+        selected_base=selected_base,
         app_code_list=app_code_list,
-        selected_date=target_date,
         selected_app=app_code
     )
+
 
 
 
