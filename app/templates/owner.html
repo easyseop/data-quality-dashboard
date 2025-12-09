@@ -8,9 +8,12 @@
         <label><b>기준년월일</b></label>
         <select name="date" class="form-select" onchange="this.form.submit()">
             {% for d in date_list %}
-            <option value="{{ d }}" {% if d == selected_date %}selected{% endif %}>{{ d }}</option>
+            <option value="{{ d.base }}" {% if d.base == selected_date %}selected{% endif %}>
+                {{ d.base[2:4] }}년 {{ d.cycle }} {{ d.type }} 검증
+            </option>
             {% endfor %}
         </select>
+
     </div>
 
     <div class="col-md-3">

@@ -4,13 +4,15 @@
 <h2>📂 Table List</h2>
 <p>테이블 검색 / 페이징 / 정렬 / 클릭 상세 이동</p>
 
-<!-- Filters -->
+<!-- Filters (form 제거) -->
 <div class="row mb-3">
-    <div class="col-md-2">
-        <label><b>기준일자</b></label>
+    <div class="col-md-3">
+        <label><b>기준 기준년월일</b></label>
         <select id="dateFilter" class="form-select">
             {% for d in date_list %}
-            <option value="{{ d }}" {% if selected_date == d %}selected{% endif %}>{{ d }}</option>
+            <option value="{{ d['base'] }}" {% if d['base'] == selected_date %}selected{% endif %}>
+                {{ d['base'][2:4] }}년 {{ d['cycle'] }} {{ d['type'] }} 검증
+            </option>
             {% endfor %}
         </select>
     </div>
@@ -55,16 +57,18 @@
 
 <script>
 $(document).ready(function () {
-
+    
     const table = $('#tableList').DataTable({
-        pageLength: 50,
-        ordering: true,
-        searching: true,
-        paging: true,
-        lengthChange: false
+    pageLength: 50,
+    ordering: true,         // 정렬 활성화
+    order: [[4, 'desc']],   // 정렬 기준 (4번째 컬럼: Error Rate)
+    searching: false,
+    paging: true,
+    deferRender: true,
+    stateSave: true,        // 마지막 정렬 상태 기억
+    lengthChange: false
     });
 
-    // Filter change → reload
     $('#dateFilter, #appFilter').on('change', function () {
         const date = $('#dateFilter').val();
         const app  = $('#appFilter').val();
@@ -75,7 +79,6 @@ $(document).ready(function () {
         window.location.href = newUrl;
     });
 
-    // Row click → detail
     $('#tableList').on('click', 'tbody tr', function () {
         const tableName = $(this).find('td:eq(1)').text();
         const date = $('#dateFilter').val();

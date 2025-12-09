@@ -12,12 +12,14 @@
     </div>
 </div>
 
-<!-- 기준일자 선택 -->
+<!-- 기준일자 + 검증차수 + 검증구분 선택 -->
 <div class="mb-3">
     <label><b>Target Date</b></label>
-    <select id="dateFilter" class="form-select" style="width:200px;">
+    <select id="dateFilter" class="form-select" style="width:260px;">
         {% for d in date_list %}
-        <option value="/?date={{ d }}" {% if d == selected_date %}selected{% endif %}>{{ d }}</option>
+        <option value="/?date={{ d.base }}" {% if d.base == selected_date %}selected{% endif %}>
+            {{ d['base'][2:4] }}년 {{ d['cycle'] }} {{ d['type'] }} 검증
+        </option>
         {% endfor %}
     </select>
 </div>

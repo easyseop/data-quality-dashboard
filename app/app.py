@@ -8,9 +8,6 @@ from io import BytesIO
 app = Flask(__name__)
 
 
-# ===================== 1) Dashboard ( / ) ===================== #
-from flask import render_template, request
-from services.db import get_connection   # 이미 있으면 중복 추가 X
 
 # ===================== Dashboard ( / ) ===================== #
 @app.route("/")
@@ -18,17 +15,31 @@ def dashboard():
     conn = get_connection()
     cur = conn.cursor()
 
-    # -------- 기준년도 목록 조회 --------
-    cur.execute("SELECT DISTINCT 기준년월일 FROM DQ_MF_ASSERTION_LIST ORDER BY 기준년월일 DESC;")
-    date_list = [row["기준년월일"] for row in cur.fetchall()]
+    # ---- 기준년도 + 검증차수 + 검증구분 조회 ----
+    cur.execute("""
+    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
+    FROM DQ_BASE_DATE_INFO
+    ORDER BY 기준년월일 DESC;
+    """)
+    rows = cur.fetchall()
+    print("==== DEBUG rows ====")
+    print(rows)
 
-    if not date_list:
-        return "No data available"
+    date_list = [
+    {
+        "base": r["기준년월일"],
+        "cycle": r["검증차수"],
+        "type": r["검증구분"]
+    }
+    for r in rows
+    ]
 
-    # 기본값 = 가장 최신 기준일자
-    selected_date = request.args.get("date") or max(date_list)
 
-    # -------- Summary KPI (MF / DW) --------
+
+    # 선택된 기준년월일
+    selected_date = request.args.get("date") or date_list[0]["base"]
+
+    # ---- 이하 기존 코드 그대로 ----
     summary_sql = """
         SELECT
             db_type,
@@ -42,7 +53,6 @@ def dashboard():
     cur.execute(summary_sql, selected_date)
     overall_kpi = cur.fetchall()
 
-    # -------- 품질지수 KPI --------
     quality_sql = """
         SELECT diagtype,
                COUNT(*) AS verified,
@@ -56,7 +66,6 @@ def dashboard():
         ) T
         GROUP BY diagtype;
     """
-
     cur.execute(quality_sql, (selected_date, selected_date, selected_date))
     rows = cur.fetchall()
 
@@ -81,7 +90,6 @@ def dashboard():
 
     kpi_all = {"verified": total_verified, "error": total_error, "quality": total_quality}
 
-    # -------- Maintenance 계획 --------
     maint_sql = """
         SELECT
             base_date,
@@ -111,6 +119,7 @@ def dashboard():
         kpi_list=kpi_list,
         maint_chart=maint_chart
     )
+
 
 
 # ===================== summary download ( / ) ===================== #
@@ -188,21 +197,33 @@ def trend_view():
     cur = conn.cursor()
 
     # 기준년월일 목록 (최신일자 목록)
+    # 기준년월일 목록 (최신일자 목록)
     cur.execute("""
-        SELECT DISTINCT 기준년월일
-        FROM DQ_MF_ASSERTION_LIST
-        ORDER BY 기준년월일 DESC
+    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
+    FROM DQ_BASE_DATE_INFO
+    ORDER BY 기준년월일 DESC
     """)
-    date_list = [row["기준년월일"] for row in cur.fetchall()]
+    rows = cur.fetchall()
+
+    date_list = [
+        {
+            "base": r["기준년월일"],
+            "cycle": r["검증차수"],
+            "type": r["검증구분"]
+        }
+        for r in rows
+    ]
 
     # 선택 기준일
-    selected_base = request.args.get("base", date_list[0])
+    selected_base = request.args.get("base", date_list[0]["base"])
 
-    # 선택 기준일 기준으로 d1,d2,d3 추출
-    base_index = date_list.index(selected_base)
-    d1 = date_list[base_index]
-    d2 = date_list[base_index + 1] if base_index + 1 < len(date_list) else None
-    d3 = date_list[base_index + 2] if base_index + 2 < len(date_list) else None
+    # base_index 구하기
+    base_index = next(i for i, d in enumerate(date_list) if d["base"] == selected_base)
+
+    d1 = date_list[base_index]["base"]
+    d2 = date_list[base_index + 1]["base"] if base_index + 1 < len(date_list) else None
+    d3 = date_list[base_index + 2]["base"] if base_index + 2 < len(date_list) else None
+
 
     # AppCode 목록
     cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
@@ -298,6 +319,7 @@ def trend_view():
         per_page=per_page,
         app_list=app_list
     )
+   
 
 
 
@@ -312,15 +334,25 @@ def owner_view():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT DISTINCT 기준년월일
-        FROM DQ_MF_ASSERTION_LIST
-        ORDER BY 기준년월일 DESC
+    SELECT DISTINCT a.기준년월일, b.검증차수, b.검증구분
+    FROM DQ_MF_ASSERTION_LIST a
+    JOIN DQ_BASE_DATE_INFO b ON a.기준년월일 = b.기준년월일
+    ORDER BY a.기준년월일 DESC
     """)
-    
-    date_list = [row["기준년월일"] for row in cur.fetchall()]
 
-    # ---- 2) 선택 기준일 처리 ----
-    selected_date = request.args.get("date", date_list[0])
+    rows = cur.fetchall()
+
+    date_list = [
+        {
+            "base": r["기준년월일"],
+            "cycle": r["검증차수"],
+            "type": r["검증구분"]
+        }
+        for r in rows
+    ]
+
+    selected_date = request.args.get("date", date_list[0]["base"])
+
 
     # AppCode 목록
     cur.execute("SELECT DISTINCT 어플리케이션코드 FROM DQ_MF_ASSERTION_LIST ORDER BY 1")
@@ -402,14 +434,22 @@ def tables_view():
 
     # ===== date list =====
     cur.execute("""
-        SELECT DISTINCT 기준년월일
-        FROM DQ_MF_ASSERTION_LIST
-        ORDER BY 기준년월일 DESC
+    SELECT DISTINCT 기준년월일, 검증차수, 검증구분
+    FROM DQ_BASE_DATE_INFO
+    ORDER BY 기준년월일 DESC
     """)
-    date_list = [row["기준년월일"] for row in cur.fetchall()]
+    rows_date = cur.fetchall()
 
-    if not target_date:
-        target_date = date_list[0]
+    date_list = [
+        {
+            "base": r["기준년월일"],
+            "cycle": r["검증차수"],
+            "type": r["검증구분"]
+        }
+        for r in rows_date
+    ]
+
+    target_date = request.args.get("date") or date_list[0]["base"]
 
     # ===== app code list =====
     cur.execute("""
