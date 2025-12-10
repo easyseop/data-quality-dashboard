@@ -22,11 +22,10 @@
     <div class="col-md-2">
         <label><b>검증구분</b></label>
         <select name="dtype" class="form-select" onchange="this.form.submit()">
-            {% for t in dtype_list %}
-            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
+            <option value="정기" selected>정기</option>
         </select>
     </div>
+
 
     <div class="col-md-2">
         <label><b>차수</b></label>

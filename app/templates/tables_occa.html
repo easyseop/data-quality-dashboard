@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>📂 수시 테이블 목록</h2>
+
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label><b>년도</b></label>
+        <select id="yearFilter" class="form-select">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}년</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>월</b></label>
+        <select id="monthFilter" class="form-select">
+            {% for m in month_list %}
+            <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                {{ m }}월
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>App Code</b></label>
+        <select id="appFilter" class="form-select">
+            <option value="ALL">ALL</option>
+            {% for app in app_code_list %}
+            <option value="{{ app }}" {% if app == selected_app %}selected{% endif %}>
+                {{ app }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<p class="text-muted">
+    선택된 수시 기준일: <b>{{ selected_base }}</b><br>
+    연결된 정기 기준일: <b>{{ selected_regular_base }}</b>
+</p>
+
+<table id="tableList" class="table table-bordered table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>App</th>
+            <th>Table Name</th>
+            <th>Error Count</th>
+            <th>Normal Count</th>
+            <th>Error Rate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tables %}
+        <tr>
+            <td>{{ t["어플리케이션코드"] }}</td>
+            <td>{{ t["테이블명"] }}</td>
+            <td>{{ t["error_cnt"] }}</td>
+            <td>{{ t["normal_cnt"] }}</td>
+            <td>{{ t["error_rate"] }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+$(document).ready(function () {
+
+    const table = $('#tableList').DataTable({
+        pageLength: 50,
+        ordering: true,
+        order: [[4, 'desc']],
+        searching: false,
+        paging: false,
+        stateSave: false,
+        lengthChange: false
+    });
+
+    $("#yearFilter, #monthFilter, #appFilter").on("change", function () {
+        const year  = $("#yearFilter").val();
+        const month = $("#monthFilter").val();
+        const app   = $("#appFilter").val();
+
+        let url = `/tables/occa?year=${year}&month=${month}`;
+        if (app) url += `&app=${app}`;
+        window.location.href = url;
+    });
+
+    // 🔥 클릭 시 detail 페이지로 이동
+    table.on("click", "tbody tr", function () {
+        const tableName = $(this).find("td:eq(1)").text().trim();
+        if (!tableName) return;
+
+        const baseDate = "{{ selected_base }}";
+        const regularBase = "{{ selected_regular_base }}";  // 수시 → 연결된 정기 기준일
+
+        // 🔥 정기 기준일을 반드시 포함해서 전달해야 detail이 정상 작동한다.
+        window.location.href =
+            `/detail/occa/${tableName}?date=${baseDate}&regular=${regularBase}`;
+    });
+
+});
+</script>
+
+
+{% endblock %}

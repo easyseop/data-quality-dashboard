@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>📂 정기 테이블 목록</h2>
+
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label><b>년도</b></label>
+        <select id="yearFilter" class="form-select">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}년</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>차수</b></label>
+        <select id="cycleFilter" class="form-select">
+            {% for c in cycle_list %}
+            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label><b>App Code</b></label>
+        <select id="appFilter" class="form-select">
+            <option value="ALL">ALL</option>
+            {% for app in app_code_list %}
+            <option value="{{ app }}" {% if app == selected_app %}selected{% endif %}>
+                {{ app }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<table id="tableList" class="table table-bordered table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>App Code</th>
+            <th>Table Name</th>
+            <th>Error Count</th>
+            <th>Normal Count</th>
+            <th>Error Rate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tables %}
+        <tr>
+            <td>{{ t["어플리케이션코드"] }}</td>
+            <td>{{ t["테이블명"] }}</td>
+            <td>{{ t["error_cnt"] }}</td>
+            <td>{{ t["normal_cnt"] }}</td>
+            <td>{{ t["error_rate"] }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+$(document).ready(function () {
+
+    // 🔥 DataTables 초기화
+    const table = $('#tableList').DataTable({
+        pageLength: 50,
+        ordering: true,
+        order: [[4, 'desc']],
+        searching: false,
+        paging: false,
+        stateSave: false,
+        lengthChange: false
+    });
+
+    // 🔥 필터 변경 → URL 재생성
+    $("#yearFilter, #cycleFilter, #appFilter").on("change", function () {
+        const year  = $("#yearFilter").val();
+        const cycle = $("#cycleFilter").val();
+        const app   = $("#appFilter").val();
+
+        let url = `/tables/regular?year=${year}&cycle=${cycle}`;
+        if (app) url += `&app=${app}`;
+        window.location.href = url;
+    });
+
+    // 🔥 DataTables row 클릭 → detail 이동
+    table.on("click", "tbody tr", function () {
+        const tableName = $(this).find("td:eq(1)").text().trim();
+        const baseDate = "{{ selected_base }}";
+
+        if (!tableName) return;
+
+        window.location.href = `/detail/regular/${tableName}?date={{ selected_base }}`;
+
+    });
+
+});
+</script>
+
+{% endblock %}

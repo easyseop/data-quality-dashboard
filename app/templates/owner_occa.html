@@ -1,0 +1,104 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2 class="mb-4">🕒 수시 검증 — 오류 담당자 현황</h2>
+
+<form method="get" action="/owner/occa" class="row mb-3">
+
+    <!-- 년도 -->
+    <div class="col-md-3">
+        <label><b>년도</b></label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+                {{ y }}년
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- 월 -->
+    <div class="col-md-3">
+        <label><b>월</b></label>
+        <select name="month" class="form-select" onchange="this.form.submit()">
+            {% for m in month_list %}
+            <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                {{ m }}월
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- AppCode -->
+    <div class="col-md-3">
+        <label><b>AppCode</b></label>
+        <select name="app" class="form-select" onchange="this.form.submit()">
+            <option value="ALL" {% if selected_app == "ALL" %}selected{% endif %}>ALL</option>
+            {% for app in app_list %}
+            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>
+                {{ app }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+</form>
+
+<hr>
+
+<!-- 선택된 수시 기준일 & 연결된 정기 검증일 표시 -->
+<p class="text-muted">
+    선택된 수시 기준일: <b>{{ selected_base }}</b><br>
+    연결된 정기 기준일: <b>{{ selected_regular_base }}</b>
+</p>
+
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>No</th>
+            <th>App</th>
+            <th>오류컬럼수</th>
+            <th>담당자명</th>
+            <th>User ID</th>
+            <th>조직명</th>
+            <th>점포명</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+        <tr>
+            <td>{{ r.rownum }}</td>
+            <td>{{ r.app_code }}</td>
+            <td class="text-danger fw-bold">{{ r.error_cols }}</td>
+            <td>{{ r.user_nm or "-" }}</td>
+            <td>{{ r.user_id or "-" }}</td>
+            <td>{{ r.org_nm or "-" }}</td>
+            <td>{{ r.brn_nm or "-" }}</td>
+        </tr>
+    {% endfor %}
+
+    {% if rows|length == 0 %}
+        <tr>
+            <td colspan="7" class="text-muted text-center">
+                해당 조건에 대한 수시 검증 결과가 없습니다.
+            </td>
+        </tr>
+    {% endif %}
+    </tbody>
+</table>
+
+<!-- pagination -->
+<nav>
+    <ul class="pagination justify-content-center">
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link"
+               href="?page={{ p }}&year={{ selected_year }}&month={{ selected_month }}&app={{ selected_app }}">
+               {{ p }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+
+{% endblock %}

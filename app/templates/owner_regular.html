@@ -1,30 +1,25 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<h2 class="mb-4">👨‍💼 오류 담당자 현황</h2>
+<h2 class="mb-4">👨‍💼 정기 검증 — 오류 담당자 현황</h2>
 
-<form method="get" action="/owner" class="row mb-3">
+<form method="get" action="/owner/regular" class="row mb-3">
 
+    <!-- 년도 -->
     <div class="col-md-3">
         <label><b>년도</b></label>
         <select name="year" class="form-select" onchange="this.form.submit()">
             {% for y in year_list %}
-            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y[:4] }}년</option>
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+                {{ y }}년
+            </option>
             {% endfor %}
         </select>
     </div>
 
+    <!-- 검증 차수 -->
     <div class="col-md-3">
-        <label><b>검증구분</b></label>
-        <select name="dtype" class="form-select" onchange="this.form.submit()">
-            {% for t in dtype_list %}
-            <option value="{{ t }}" {% if t == selected_dtype %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="col-md-3">
-        <label><b>검증차수</b></label>
+        <label><b>검증 차수</b></label>
         <select name="cycle" class="form-select" onchange="this.form.submit()">
             {% for c in cycle_list %}
             <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>
@@ -34,22 +29,32 @@
         </select>
     </div>
 
+    <!-- AppCode -->
     <div class="col-md-3">
-        <label><b>AppCode 필터</b></label>
+        <label><b>AppCode</b></label>
         <select name="app" class="form-select" onchange="this.form.submit()">
             <option value="ALL" {% if selected_app == "ALL" %}selected{% endif %}>ALL</option>
             {% for app in app_list %}
-            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>{{ app }}</option>
+            <option value="{{ app }}" {% if selected_app == app %}selected{% endif %}>
+                {{ app }}
+            </option>
             {% endfor %}
         </select>
     </div>
+
 </form>
 
+<hr>
+
+<!-- 선택된 정기 기준년월일 표시 -->
+<p class="text-muted">
+    선택된 기준일(정기): <b>{{ selected_base }}</b>
+</p>
 
 <table class="table table-bordered table-hover align-middle">
     <thead class="table-light">
         <tr>
-            <th style="width:70px;">No</th>
+            <th>No</th>
             <th>App</th>
             <th>오류컬럼수</th>
             <th>담당자명</th>
@@ -60,25 +65,33 @@
     </thead>
     <tbody>
     {% for r in rows %}
-    <tr>
-        <td>{{ r.rownum }}</td>
-        <td>{{ r.app_code }}</td>
-        <td class="text-danger fw-bold">{{ r.error_cols }}</td>
-        <td>{{ r.user_nm or "-" }}</td>
-        <td>{{ r.user_id or "-" }}</td>
-        <td>{{ r.org_nm or "-" }}</td>
-        <td>{{ r.brn_nm or "-" }}</td>
-    </tr>
+        <tr>
+            <td>{{ r.rownum }}</td>
+            <td>{{ r.app_code }}</td>
+            <td class="text-danger fw-bold">{{ r.error_cols }}</td>
+            <td>{{ r.user_nm or "-" }}</td>
+            <td>{{ r.user_id or "-" }}</td>
+            <td>{{ r.org_nm or "-" }}</td>
+            <td>{{ r.brn_nm or "-" }}</td>
+        </tr>
     {% endfor %}
+    {% if rows|length == 0 %}
+        <tr>
+            <td colspan="7" class="text-muted text-center">
+                해당 조건에 대한 정기 검증 결과가 없습니다.
+            </td>
+        </tr>
+    {% endif %}
     </tbody>
 </table>
 
+<!-- pagination -->
 <nav>
     <ul class="pagination justify-content-center">
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
             <a class="page-link"
-               href="?page={{ p }}&date={{ selected_date }}">
+               href="?page={{ p }}&year={{ selected_year }}&cycle={{ selected_cycle }}&app={{ selected_app }}">
                {{ p }}
             </a>
         </li>
