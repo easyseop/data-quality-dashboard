@@ -5,6 +5,8 @@ from services.db import get_connection
 from utils.filter_occa import *
 from utils.filter_regular import *
 from utils.filter_base import *
+from utils.dashboard_widgets import WIDGETS
+
 import pandas as pd
 from io import BytesIO
 
@@ -17,14 +19,19 @@ def dashboard():
     # ---- 정기 기준일 필터만 사용 ----
     ctx = get_regular_filter_context(request)
 
-    # 🔥 dtype은 필터 UI에는 보이지만 실제 동작은 정기만
-    selected_dtype = "정기"
-
     selected_year  = ctx["selected_year"]
     selected_cycle = ctx["selected_cycle"]
     selected_base  = ctx["selected_base"]
     year_list      = ctx["year_list"]
     cycle_list     = ctx["cycle_list"]
+
+    # UI 표시용 (로직에는 영향 X)
+    selected_dtype = "정기"
+
+    # ---- 오류개선율 / 정비계획 등록률 / 품질 KPI ----
+    improve_rate = compute_improvement_rate(selected_base)
+    reg_rate     = compute_reg_rate(selected_base)
+    quality_kpi  = compute_quality_kpi(improve_rate, reg_rate)
 
     # ---- Summary KPI ----
     overall_kpi = get_summary_kpi(selected_base)
@@ -32,7 +39,7 @@ def dashboard():
     # ---- 품질 KPI ----
     kpi_all, kpi_inst, kpi_date, kpi_list = get_quality_kpi(selected_base)
 
-    # ---- 정비계획 ----
+    # ---- 정비계획(최근 3개월) ----
     maint_chart = get_maint_chart()
 
     return render_template(
@@ -42,7 +49,7 @@ def dashboard():
 
         selected_year=selected_year,
         selected_cycle=selected_cycle,
-        selected_dtype=selected_dtype,   # 🔥 필터는 표시용으로 유지
+        selected_dtype=selected_dtype,
         selected_base=selected_base,
 
         overall_kpi=overall_kpi,
@@ -50,7 +57,11 @@ def dashboard():
         kpi_inst=kpi_inst,
         kpi_date=kpi_date,
         kpi_list=kpi_list,
-        maint_chart=maint_chart
+        maint_chart=maint_chart,
+
+        improve_rate=improve_rate,
+        reg_rate=reg_rate,
+        quality_kpi=quality_kpi,
     )
 
 

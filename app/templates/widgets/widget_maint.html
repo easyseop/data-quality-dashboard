@@ -1,0 +1,26 @@
+<h4 class="fw-bold mb-3">🛠 정비계획 등록률 (최근 3개월)</h4>
+
+<table class="table table-bordered table-striped text-center align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>기준일자</th>
+            <th>대상건수</th>
+            <th>등록건수</th>
+            <th>정비가능</th>
+            <th>정비불가능</th>
+            <th>등록률(%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in maint_chart %}
+        <tr>
+            <td>{{ row.base_date }}</td>
+            <td>{{ row.target_cnt }}</td>
+            <td class="text-primary fw-bold">{{ row.registered_cnt }}</td>
+            <td class="text-success fw-bold">{{ row.maint_yes }}</td>
+            <td class="text-danger fw-bold">{{ row.maint_no }}</td>
+            <td><b>{{ row.rate }}%</b></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

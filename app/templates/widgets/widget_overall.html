@@ -1,0 +1,26 @@
+<h4 class="fw-bold mb-3">
+    🌐 Overall KPI by DB Type ({{ selected_year[2:4] }}년 {{ selected_cycle }} 정기)
+</h4>
+
+<table class="table table-bordered table-striped align-middle text-center">
+    <thead class="table-light">
+        <tr>
+            <th>DB Type</th>
+            <th>Total</th>
+            <th>Error</th>
+            <th>Normal</th>
+            <th>Error Rate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in overall_kpi %}
+        <tr>
+            <td><b>{{ row.db_type }}</b></td>
+            <td>{{ "{:,}".format(row.total_cnt) }}</td>
+            <td class="text-danger fw-bold">{{ "{:,}".format(row.error_cnt) }}</td>
+            <td class="text-success fw-bold">{{ "{:,}".format(row.normal_cnt) }}</td>
+            <td>{{ (row.error_cnt / row.total_cnt * 100) | round(2) if row.total_cnt else 0 }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

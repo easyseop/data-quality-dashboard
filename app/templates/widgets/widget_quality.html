@@ -1,0 +1,38 @@
+<h4 class="fw-bold mb-3">🔎 품질 점검 결과 요약</h4>
+
+<table class="table table-bordered table-sm text-center align-middle">
+    <thead class="table-light">
+        <tr>
+            <th></th>
+            <th>검증컬럼</th>
+            <th>오류컬럼</th>
+            <th>품질지수(%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><b>전체</b></td>
+            <td>{{ kpi_all.verified }}</td>
+            <td class="text-danger">{{ kpi_all.error }}</td>
+            <td><b>{{ kpi_all.quality }}%</b></td>
+        </tr>
+        <tr>
+            <td>인스턴스(I)</td>
+            <td>{{ kpi_inst.verified }}</td>
+            <td class="text-danger">{{ kpi_inst.error }}</td>
+            <td>{{ kpi_inst.quality }}%</td>
+        </tr>
+        <tr>
+            <td>날짜(D)</td>
+            <td>{{ kpi_date.verified }}</td>
+            <td class="text-danger">{{ kpi_date.error }}</td>
+            <td>{{ kpi_date.quality }}%</td>
+        </tr>
+        <tr>
+            <td>목록(L)</td>
+            <td>{{ kpi_list.verified }}</td>
+            <td class="text-danger">{{ kpi_list.error }}</td>
+            <td>{{ kpi_list.quality }}%</td>
+        </tr>
+    </tbody>
+</table>

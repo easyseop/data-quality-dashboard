@@ -1,18 +1,36 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="d-flex justify-content-between align-items-center">
-    <h2 class="mb-4">📊 Data Quality Dashboard</h2>
+<style>
+/* 🔥 위젯 카드 스타일 */
+.widget-block {
+    background: #ffffff;
+    padding: 20px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
 
-    <!-- 다운로드 버튼 -->
-    <div class="d-flex justify-content-end mb-3">
-        <a href="/download/summary?date={{ selected_base }}" class="btn btn-success">
-            📥 통계정보 상세 다운로드
-        </a>
-    </div>
+/* 🔥 드래그 시 스타일 */
+.dragging {
+    opacity: 0.6;
+    border: 2px dashed #007bff !important;
+}
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">📊 Data Quality Dashboard</h2>
+
+    <a href="/download/summary?date={{ selected_base }}"
+       class="btn btn-outline-success shadow-sm px-3">
+        <i class="bi bi-download"></i>
+        <span>통계정보 다운로드</span>
+    </a>
 </div>
 
-<!-- 필터: 년도 / 검증구분 / 차수 -->
+
+<!-- 🔥 필터: 년도 / 차수 (정기만 지원) -->
 <form method="get" action="/" class="row mb-3">
 
     <div class="col-md-2">
@@ -30,10 +48,9 @@
         <label><b>검증구분</b></label>
         <select name="dtype" class="form-select" onchange="this.form.submit()">
             <option value="정기" selected>정기</option>
-            <option value="수시" disabled>수시 (지원안함)</option>
+            <option value="수시" disabled>수시(지원안함)</option>
         </select>
     </div>
-
 
     <div class="col-md-2">
         <label><b>차수</b></label>
@@ -47,117 +64,157 @@
     </div>
 
 </form>
+<!-- 표시 설정 (드롭다운) -->
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+            ⚙ 표시 설정
+        </button>
+
+        <ul class="dropdown-menu p-3" style="min-width: 240px;" onclick="event.stopPropagation();">
+
+            <div class="form-check">
+                <input class="form-check-input widget-toggle"
+                       type="checkbox"
+                       id="widget_improve"
+                       data-target="#widget-improve"
+                       checked>
+                <label class="form-check-label" for="widget_improve">오류 개선율 / KPI</label>
+            </div>
+
+            <div class="form-check">
+                <input class="form-check-input widget-toggle"
+                       type="checkbox"
+                       id="widget_overall"
+                       data-target="#widget-overall"
+                       checked>
+                <label class="form-check-label" for="widget_overall">Overall KPI</label>
+            </div>
+
+            <div class="form-check">
+                <input class="form-check-input widget-toggle"
+                       type="checkbox"
+                       id="widget_quality"
+                       data-target="#widget-quality"
+                       checked>
+                <label class="form-check-label" for="widget_quality">품질지수 요약</label>
+            </div>
+
+            <div class="form-check">
+                <input class="form-check-input widget-toggle"
+                       type="checkbox"
+                       id="widget_maint"
+                       data-target="#widget-maint"
+                       checked>
+                <label class="form-check-label" for="widget_maint">정비계획 등록률</label>
+            </div>
+
+        </ul>
+    </div>
 
 <hr class="my-4">
 
-<!-- 1) 전체 KPI by DB Type -->
-<h4 class="fw-bold mb-3">
-    🌐 Overall KPI by DB Type ({{ selected_year[2:4] }}년 {{ selected_cycle }} {{ selected_dtype }} 검증)
-</h4>
+<!-- ===================== 위젯 섹션 ===================== -->
 
-<table class="table table-bordered table-striped align-middle text-center">
-    <thead class="table-light">
-        <tr>
-            <th>DB Type</th>
-            <th>Total</th>
-            <th>Error</th>
-            <th>Normal</th>
-            <th>Error Rate</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in overall_kpi %}
-        <tr>
-            <td><b>{{ row.db_type }}</b></td>
-            <td>{{ "{:,}".format(row.total_cnt) }}</td>
-            <td class="text-danger fw-bold">{{ "{:,}".format(row.error_cnt) }}</td>
-            <td class="text-success fw-bold">{{ "{:,}".format(row.normal_cnt) }}</td>
-            <td>{{ (row.error_cnt / row.total_cnt * 100) | round(2) if row.total_cnt > 0 else 0 }}%</td>
-        </tr>
-        {% endfor %}
-        {% if overall_kpi|length == 0 %}
-        <tr>
-            <td colspan="5" class="text-muted">해당 조건에 대한 Summary 데이터가 없습니다.</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
+<div id="widgets-container">
 
-<hr class="my-4">
+    <div id="widget-improve" class="widget-block">
+        <div class="widget-content">
+            {% include "widgets/widget_improve.html" %}
+        </div>
+    </div>
 
-<!-- 2) 품질지수 요약 표 -->
-<h4 class="fw-bold mb-3">🔎 품질 점검 결과 요약</h4>
+    <div id="widget-overall" class="widget-block">
+        <div class="widget-content">
+            {% include "widgets/widget_overall.html" %}
+        </div>
+    </div>
 
-<table class="table table-bordered table-sm text-center align-middle">
-    <thead class="table-light">
-        <tr>
-            <th></th>
-            <th>검증컬럼</th>
-            <th>오류컬럼</th>
-            <th>품질지수(%)</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><b>전체</b></td>
-            <td>{{ kpi_all.verified or 0 }}</td>
-            <td class="text-danger">{{ kpi_all.error or 0 }}</td>
-            <td><b>{{ kpi_all.quality or 0 }}%</b></td>
-        </tr>
-        <tr>
-            <td>인스턴스(I)</td>
-            <td>{{ kpi_inst.verified }}</td>
-            <td class="text-danger">{{ kpi_inst.error }}</td>
-            <td>{{ kpi_inst.quality }}%</td>
-        </tr>
-        <tr>
-            <td>날짜(D)</td>
-            <td>{{ kpi_date.verified }}</td>
-            <td class="text-danger">{{ kpi_date.error }}</td>
-            <td>{{ kpi_date.quality }}%</td>
-        </tr>
-        <tr>
-            <td>목록(L)</td>
-            <td>{{ kpi_list.verified }}</td>
-            <td class="text-danger">{{ kpi_list.error }}</td>
-            <td>{{ kpi_list.quality }}%</td>
-        </tr>
-    </tbody>
-</table>
+    <div id="widget-quality" class="widget-block">
+        <div class="widget-content">
+            {% include "widgets/widget_quality.html" %}
+        </div>
+    </div>
 
-<hr class="my-4">
+    <div id="widget-maint" class="widget-block">
+        <div class="widget-content">
+            {% include "widgets/widget_maint.html" %}
+        </div>
+    </div>
 
-<!-- 3) 정비계획 등록률 -->
-<h4 class="fw-bold mb-3">🛠 정비계획 등록률 (최근 3개월)</h4>
+</div>
 
-<table class="table table-bordered table-striped text-center align-middle">
-    <thead class="table-light">
-        <tr>
-            <th>기준일자</th>
-            <th>대상건수</th>
-            <th>등록건수</th>
-            <th>정비가능</th>
-            <th>정비불가능</th>
-            <th>등록률(%)</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in maint_chart %}
-        <tr>
-            <td>{{ row.base_date }}</td>
-            <td>{{ row.target_cnt }}</td>
-            <td class="text-primary fw-bold">{{ row.registered_cnt }}</td>
-            <td class="text-success fw-bold">{{ row.maint_yes }}</td>
-            <td class="text-danger fw-bold">{{ row.maint_no }}</td>
-            <td><b>{{ row.rate }}%</b></td>
-        </tr>
-        {% endfor %}
-        {% if maint_chart|length == 0 %}
-        <tr>
-            <td colspan="6" class="text-muted">정비계획 데이터가 없습니다.</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
+<!-- ===================== Scripts ===================== -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script>
+$(document).ready(function () {
+
+    /* -----------------------------
+       🔥 1) 체크박스 ON/OFF 적용
+       ----------------------------- */
+
+    $(".widget-toggle").on("change", function () {
+        const target = $(this).data("target");      // 예: "#widget-improve"
+        const content = $(target).find(".widget-content");
+
+        if ($(this).is(":checked")) content.show();
+        else content.hide();
+
+        // 저장
+        const state = {};
+        $(".widget-toggle").each(function () {
+            state[$(this).data("target")] = $(this).is(":checked");
+        });
+        localStorage.setItem("widget_state", JSON.stringify(state));
+    });
+
+    /* -----------------------------
+       🔥 2) 저장된 상태 복원
+       ----------------------------- */
+
+    const saved = JSON.parse(localStorage.getItem("widget_state") || "{}");
+
+    for (const key in saved) {
+        const checkbox = $(`.widget-toggle[data-target='${key}']`);
+        const content = $(key).find(".widget-content");
+
+        if (!saved[key]) {
+            checkbox.prop("checked", false);
+            content.hide();
+        }
+    }
+
+    /* -----------------------------
+       🔥 3) 드래그 정렬 + LocalStorage 저장
+       ----------------------------- */
+
+    const savedOrder = JSON.parse(localStorage.getItem("widget_order") || "[]");
+
+    // 저장된 순서대로 재배치
+    if (savedOrder.length > 0) {
+        savedOrder.forEach(id => {
+            const el = document.getElementById(id.replace("#", ""));
+            if (el) document.getElementById("widgets-container").appendChild(el);
+        });
+    }
+
+    Sortable.create(document.getElementById("widgets-container"), {
+        animation: 150,
+        handle: ".widget-block",  // 카드 전체를 드래그
+        onEnd: function () {
+            const order = [];
+            $("#widgets-container").children().each(function () {
+                order.push("#" + $(this).attr("id"));
+            });
+            localStorage.setItem("widget_order", JSON.stringify(order));
+        }
+    });
+
+});
+</script>
 
 {% endblock %}

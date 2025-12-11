@@ -1,0 +1,39 @@
+<h4 class="fw-bold mb-3">📉 오류 개선율 / 정비계획 등록률 / 품질 KPI</h4>
+
+<p class="text-muted">
+    비교 정기 기준일: <b>{{ selected_base }}</b><br>
+    비교 수시 기준일: <b>{{ improve_rate.latest_occa or '수시 데이터 없음' }}</b>
+</p>
+
+<table class="table table-bordered table-striped text-center align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>구분</th>
+            <th>오류 개선율 (%)</th>
+            <th>정비계획 등록률 (%)</th>
+            <th>품질 KPI</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><b>MF</b></td>
+            <td>{{ improve_rate.mf.rate }}%</td>
+            <td>{{ reg_rate.mf }}%</td>
+            <td><b>{{ quality_kpi.mf }}%</b></td>
+        </tr>
+
+        <tr>
+            <td><b>DW</b></td>
+            <td>{{ improve_rate.dw.rate }}%</td>
+            <td>{{ reg_rate.dw }}%</td>
+            <td><b>{{ quality_kpi.dw }}%</b></td>
+        </tr>
+
+        <tr class="table-primary">
+            <td><b>Total</b></td>
+            <td>{{ improve_rate.total.rate }}%</td>
+            <td>{{ reg_rate.total }}%</td>
+            <td><b>{{ quality_kpi.total }}%</b></td>
+        </tr>
+    </tbody>
+</table>

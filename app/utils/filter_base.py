@@ -260,3 +260,154 @@ def get_maint_chart():
     cur.close()
     conn.close()
     return rows
+
+# ---------------------------
+# 1) 오류 개선율 계산
+# ---------------------------
+def compute_improvement_rate(base_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # --- 1) 정기 오류 컬럼 조회 ---
+    cur.execute("""
+        SELECT A.어플리케이션코드 AS app_code, A.테이블명, A.컬럼명
+        FROM DQ_MF_ASSERTION_LIST A
+        JOIN (
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_INST_RESULT
+            UNION ALL
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_DATE_RESULT
+            UNION ALL
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_LIST_RESULT
+        ) R
+        ON A.기준년월일 = R.기준년월일
+        AND A.테이블명 = R.테이블명
+        AND A.컬럼명 = R.컬럼명
+        WHERE A.기준년월일=%s AND R.오류여부='Y'
+    """, (base_date,))
+    regular_errors = cur.fetchall()
+
+    # --- 시스템 구분 함수 ---
+    def sys_type(app_code):
+        return "mf" if app_code in ("APP001","APP002","APP003","APP004","APP005") else "dw"
+
+    # --- 정기 오류 목록 시스템별 count ---
+    stats = {
+        "mf": {"total":0, "improved":0},
+        "dw": {"total":0, "improved":0},
+        "total": {"total":0, "improved":0},
+    }
+
+    # 정기 오류 total count
+    for row in regular_errors:
+        s = sys_type(row["app_code"])
+        stats[s]["total"] += 1
+        stats["total"]["total"] += 1
+
+    # --- 2) 최신 수시 기준일 찾기 ---
+    cur.execute("""
+        SELECT MAX(기준년월일) AS latest
+        FROM DQ_BASE_DATE_INFO
+        WHERE 정기검증기준년월일 = %s
+    """, (base_date,))
+    latest = cur.fetchone()["latest"]
+
+    if not latest:
+        return {
+            "mf":{"rate":0},
+            "dw":{"rate":0},
+            "total":{"rate":0}
+        }
+
+    # --- 3) 최신 수시 오류 조회 ---
+    cur.execute("""
+        SELECT A.어플리케이션코드 AS app_code, A.테이블명, A.컬럼명, R.오류여부
+        FROM DQ_MF_ASSERTION_LIST_OCCA A
+        JOIN (
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_INST_RESULT_OCCA
+            UNION ALL
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_DATE_RESULT_OCCA
+            UNION ALL
+            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+            FROM DQ_MF_LIST_RESULT_OCCA
+        ) R
+        ON A.기준년월일 = R.기준년월일
+        AND A.테이블명 = R.테이블명
+        AND A.컬럼명 = R.컬럼명
+        WHERE A.기준년월일=%s
+    """, (latest,))
+    latest_rows = cur.fetchall()
+
+    occa_map = {
+        (r["테이블명"], r["컬럼명"]): r["오류여부"]
+        for r in latest_rows
+    }
+
+    # --- 4) 개선 여부 계산 ---
+    for row in regular_errors:
+        key = (row["테이블명"], row["컬럼명"])
+        s = sys_type(row["app_code"])
+
+        if key in occa_map and occa_map[key] == "N":
+            stats[s]["improved"] += 1
+            stats["total"]["improved"] += 1
+
+    # --- 5) rate 계산 ---
+    result = {}
+    for s in ("mf","dw","total"):
+        total = stats[s]["total"]
+        improved = stats[s]["improved"]
+        result[s] = {"rate": round(improved / total * 100, 2) if total else 0}
+
+    result["latest_occa"] = latest or None
+    return result
+
+def compute_reg_rate(base_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT app_code, maint_plan_reg
+        FROM DQ_MAINT_PLAN_TABLE
+        WHERE base_date=%s
+    """, (base_date,))
+    rows = cur.fetchall()
+
+    def sys_type(app_code):
+        return "mf" if app_code in ("APP001","APP002","APP003","APP004","APP005") else "dw"
+
+    stats = {
+        "mf": {"total":0, "reg":0},
+        "dw": {"total":0, "reg":0},
+        "total": {"total":0, "reg":0},
+    }
+
+    for r in rows:
+        s = sys_type(r["app_code"])
+        stats[s]["total"] += 1
+        stats["total"]["total"] += 1
+
+        if r["maint_plan_reg"] == "Y":
+            stats[s]["reg"] += 1
+            stats["total"]["reg"] += 1
+
+    rate = {
+        s: round(stats[s]["reg"] / stats[s]["total"] * 100, 2) if stats[s]["total"] else 0
+        for s in ("mf","dw","total")
+    }
+
+    return rate
+
+def compute_quality_kpi(improve_rate, reg_rate):
+    return {
+        s: round(
+                improve_rate[s]["rate"] * 0.5 +
+                reg_rate[s] * 0.5,
+                2
+            )
+        for s in ("mf","dw","total")
+    }
