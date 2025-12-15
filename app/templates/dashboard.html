@@ -2,28 +2,27 @@
 {% block content %}
 
 <style>
-/* 🔥 위젯 카드 스타일 */
-.widget-block {
-    background: #ffffff;
-    padding: 20px;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    margin-bottom: 25px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
+    /* 🔥 위젯 카드 스타일 */
+    .widget-block {
+        background: #ffffff;
+        padding: 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
 
-/* 🔥 드래그 시 스타일 */
-.dragging {
-    opacity: 0.6;
-    border: 2px dashed #007bff !important;
-}
+    /* 🔥 드래그 시 스타일 */
+    .dragging {
+        opacity: 0.6;
+        border: 2px dashed #007bff !important;
+    }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">📊 Data Quality Dashboard</h2>
 
-    <a href="/download/summary?date={{ selected_base }}"
-       class="btn btn-outline-success shadow-sm px-3">
+    <a href="/download/summary?date={{ selected_base }}" class="btn btn-outline-success shadow-sm px-3">
         <i class="bi bi-download"></i>
         <span>통계정보 다운로드</span>
     </a>
@@ -37,7 +36,7 @@
         <label><b>년도</b></label>
         <select name="year" class="form-select" onchange="this.form.submit()">
             {% for y in year_list %}
-            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+            <option value="{{ y }}" {% if y==selected_year %}selected{% endif %}>
                 {{ y }}년
             </option>
             {% endfor %}
@@ -56,7 +55,7 @@
         <label><b>차수</b></label>
         <select name="cycle" class="form-select" onchange="this.form.submit()">
             {% for c in cycle_list %}
-            <option value="{{ c }}" {% if c == selected_cycle %}selected{% endif %}>
+            <option value="{{ c }}" {% if c==selected_cycle %}selected{% endif %}>
                 {{ c }}
             </option>
             {% endfor %}
@@ -65,60 +64,57 @@
 
 </form>
 <!-- 표시 설정 (드롭다운) -->
-    <div class="dropdown">
-        <button class="btn btn-outline-secondary dropdown-toggle"
-                type="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false">
-            ⚙ 표시 설정
-        </button>
+<div class="dropdown">
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+        aria-expanded="false">
+        ⚙ 표시 설정
+    </button>
 
-        <ul class="dropdown-menu p-3" style="min-width: 240px;" onclick="event.stopPropagation();">
+    <ul class="dropdown-menu p-3" style="min-width: 240px;" onclick="event.stopPropagation();">
 
-            <div class="form-check">
-                <input class="form-check-input widget-toggle"
-                       type="checkbox"
-                       id="widget_improve"
-                       data-target="#widget-improve"
-                       checked>
-                <label class="form-check-label" for="widget_improve">오류 개선율 / KPI</label>
-            </div>
+        <div class="form-check">
+            <input class="form-check-input widget-toggle" type="checkbox" id="widget_improve"
+                data-target="#widget-improve" checked>
+            <label class="form-check-label" for="widget_improve">오류 개선율</label>
+        </div>
 
-            <div class="form-check">
-                <input class="form-check-input widget-toggle"
-                       type="checkbox"
-                       id="widget_overall"
-                       data-target="#widget-overall"
-                       checked>
-                <label class="form-check-label" for="widget_overall">Overall KPI</label>
-            </div>
+        <div class="form-check">
+            <input class="form-check-input widget-toggle" type="checkbox" id="widget_kpi_trend"
+                data-target="#widget-kpi-trend" checked>
+            <label class="form-check-label" for="widget_kpi_trend">KPI 추세 그래프</label>
+        </div>
 
-            <div class="form-check">
-                <input class="form-check-input widget-toggle"
-                       type="checkbox"
-                       id="widget_quality"
-                       data-target="#widget-quality"
-                       checked>
-                <label class="form-check-label" for="widget_quality">품질지수 요약</label>
-            </div>
+        <div class="form-check">
+            <input class="form-check-input widget-toggle" type="checkbox" id="widget_overall"
+                data-target="#widget-overall" checked>
+            <label class="form-check-label" for="widget_overall">Overall KPI</label>
+        </div>
 
-            <div class="form-check">
-                <input class="form-check-input widget-toggle"
-                       type="checkbox"
-                       id="widget_maint"
-                       data-target="#widget-maint"
-                       checked>
-                <label class="form-check-label" for="widget_maint">정비계획 등록률</label>
-            </div>
+        <div class="form-check">
+            <input class="form-check-input widget-toggle" type="checkbox" id="widget_quality"
+                data-target="#widget-quality" checked>
+            <label class="form-check-label" for="widget_quality">품질지수 요약</label>
+        </div>
 
-        </ul>
-    </div>
+        <div class="form-check">
+            <input class="form-check-input widget-toggle" type="checkbox" id="widget_maint" data-target="#widget-maint"
+                checked>
+            <label class="form-check-label" for="widget_maint">정비계획 등록률</label>
+        </div>
+
+    </ul>
+</div>
 
 <hr class="my-4">
 
 <!-- ===================== 위젯 섹션 ===================== -->
 
 <div id="widgets-container">
+    <div id="widget-kpi-trend" class="widget-block">
+        <div class="widget-content">
+            {% include "widgets/widget_kpi_trend.html" %}
+        </div>
+    </div>
 
     <div id="widget-improve" class="widget-block">
         <div class="widget-content">
@@ -143,6 +139,7 @@
             {% include "widgets/widget_maint.html" %}
         </div>
     </div>
+</div>
 
 </div>
 
@@ -150,71 +147,73 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
+
+
 <script>
-$(document).ready(function () {
+    $(document).ready(function () {
 
-    /* -----------------------------
-       🔥 1) 체크박스 ON/OFF 적용
-       ----------------------------- */
+        /* -----------------------------
+           🔥 1) 체크박스 ON/OFF 적용
+           ----------------------------- */
 
-    $(".widget-toggle").on("change", function () {
-        const target = $(this).data("target");      // 예: "#widget-improve"
-        const content = $(target).find(".widget-content");
+        $(".widget-toggle").on("change", function () {
+            const target = $(this).data("target");      // 예: "#widget-improve"
+            const content = $(target).find(".widget-content");
 
-        if ($(this).is(":checked")) content.show();
-        else content.hide();
+            if ($(this).is(":checked")) content.show();
+            else content.hide();
 
-        // 저장
-        const state = {};
-        $(".widget-toggle").each(function () {
-            state[$(this).data("target")] = $(this).is(":checked");
-        });
-        localStorage.setItem("widget_state", JSON.stringify(state));
-    });
-
-    /* -----------------------------
-       🔥 2) 저장된 상태 복원
-       ----------------------------- */
-
-    const saved = JSON.parse(localStorage.getItem("widget_state") || "{}");
-
-    for (const key in saved) {
-        const checkbox = $(`.widget-toggle[data-target='${key}']`);
-        const content = $(key).find(".widget-content");
-
-        if (!saved[key]) {
-            checkbox.prop("checked", false);
-            content.hide();
-        }
-    }
-
-    /* -----------------------------
-       🔥 3) 드래그 정렬 + LocalStorage 저장
-       ----------------------------- */
-
-    const savedOrder = JSON.parse(localStorage.getItem("widget_order") || "[]");
-
-    // 저장된 순서대로 재배치
-    if (savedOrder.length > 0) {
-        savedOrder.forEach(id => {
-            const el = document.getElementById(id.replace("#", ""));
-            if (el) document.getElementById("widgets-container").appendChild(el);
-        });
-    }
-
-    Sortable.create(document.getElementById("widgets-container"), {
-        animation: 150,
-        handle: ".widget-block",  // 카드 전체를 드래그
-        onEnd: function () {
-            const order = [];
-            $("#widgets-container").children().each(function () {
-                order.push("#" + $(this).attr("id"));
+            // 저장
+            const state = {};
+            $(".widget-toggle").each(function () {
+                state[$(this).data("target")] = $(this).is(":checked");
             });
-            localStorage.setItem("widget_order", JSON.stringify(order));
-        }
-    });
+            localStorage.setItem("widget_state", JSON.stringify(state));
+        });
 
-});
+        /* -----------------------------
+           🔥 2) 저장된 상태 복원
+           ----------------------------- */
+
+        const saved = JSON.parse(localStorage.getItem("widget_state") || "{}");
+
+        for (const key in saved) {
+            const checkbox = $(`.widget-toggle[data-target='${key}']`);
+            const content = $(key).find(".widget-content");
+
+            if (!saved[key]) {
+                checkbox.prop("checked", false);
+                content.hide();
+            }
+        }
+
+        /* -----------------------------
+           🔥 3) 드래그 정렬 + LocalStorage 저장
+           ----------------------------- */
+
+        const savedOrder = JSON.parse(localStorage.getItem("widget_order") || "[]");
+
+        // 저장된 순서대로 재배치
+        if (savedOrder.length > 0) {
+            savedOrder.forEach(id => {
+                const el = document.getElementById(id.replace("#", ""));
+                if (el) document.getElementById("widgets-container").appendChild(el);
+            });
+        }
+
+        Sortable.create(document.getElementById("widgets-container"), {
+            animation: 150,
+            handle: ".widget-block",  // 카드 전체를 드래그
+            onEnd: function () {
+                const order = [];
+                $("#widgets-container").children().each(function () {
+                    order.push("#" + $(this).attr("id"));
+                });
+                localStorage.setItem("widget_order", JSON.stringify(order));
+            }
+        });
+
+    });
 </script>
 
 {% endblock %}

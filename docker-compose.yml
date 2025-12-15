@@ -10,21 +10,21 @@ services:
     restart: always
 
   mysql:
-      image: mysql:8.0
-      container_name: dq-mysql
-      restart: always
-      environment:
-        MYSQL_ROOT_PASSWORD: rootpassword
-        MYSQL_DATABASE: data_quality
-        MYSQL_USER: dquser
-        MYSQL_PASSWORD: 1234
-      ports:
-        - "3306:3306"
-      volumes:
-        - dq-mysql-data:/var/lib/mysql
-        - ./mysql/init:/docker-entrypoint-initdb.d
+    image: mysql:8.0
+    container_name: dq-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: data_quality
+      MYSQL_USER: dquser
+      MYSQL_PASSWORD: 1234
+    ports:
+      - "3307:3306"
+    volumes:
+      - dq-mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
 
 volumes:
   dq-mysql-data:
-
-
+    external: true
+    name: data-quality-dashboard_dq-mysql-data

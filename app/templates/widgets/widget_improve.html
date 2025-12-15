@@ -1,6 +1,19 @@
-<h4 class="fw-bold mb-3">📉 오류 개선율 / 정비계획 등록률 / 품질 KPI</h4>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">📉 오류 개선율 / 정비계획 등록률</h4>
 
-<p class="text-muted">
+    <!-- Premium Segmented Control Toggle -->
+    <div class="btn-group btn-group-sm" role="group" aria-label="Display Mode">
+        <input type="radio" class="btn-check" name="improveToggle" id="btnImprovePercent" autocomplete="off" checked
+            onclick="setImproveMode('percent')">
+        <label class="btn btn-outline-primary" for="btnImprovePercent">%</label>
+
+        <input type="radio" class="btn-check" name="improveToggle" id="btnImproveFraction" autocomplete="off"
+            onclick="setImproveMode('fraction')">
+        <label class="btn btn-outline-primary" for="btnImproveFraction">건수</label>
+    </div>
+</div>
+
+<p class="text-muted mb-2" style="font-size: 0.9rem;">
     비교 정기 기준일: <b>{{ selected_base }}</b><br>
     비교 수시 기준일: <b>{{ improve_rate.latest_occa or '수시 데이터 없음' }}</b>
 </p>
@@ -9,31 +22,107 @@
     <thead class="table-light">
         <tr>
             <th>구분</th>
-            <th>오류 개선율 (%)</th>
-            <th>정비계획 등록률 (%)</th>
+            <th>오류 개선율 <span class="unit-label">(%)</span></th>
+            <th>정비계획 등록률 <span class="unit-label">(%)</span></th>
             <th>품질 KPI</th>
         </tr>
     </thead>
     <tbody>
         <tr>
             <td><b>MF</b></td>
-            <td>{{ improve_rate.mf.rate }}%</td>
-            <td>{{ reg_rate.mf }}%</td>
+            <!-- Improve Rate -->
+            <td class="improve-cell" data-rate="{{ improve_rate.mf.rate }}"
+                data-improved="{{ improve_rate.mf.improved }}" data-total="{{ improve_rate.mf.total }}">
+                {{ improve_rate.mf.rate }}%
+            </td>
+            <!-- Reg Rate -->
+            <td class="reg-cell" data-rate="{{ reg_rate.mf if reg_rate.mf is number else 0 }}"
+                data-reg="{{ reg_rate.mf_reg_cnt if reg_rate.mf_reg_cnt is defined else 0 }}"
+                data-total="{{ reg_rate.mf_total_cnt if reg_rate.mf_total_cnt is defined else 0 }}">
+                {#
+                Note: reg_rate dictionary currently only stores simple rates like {'mf': 95.5, ...}.
+                If we want counts, we strictly need to update compute_reg_rate in filter_base.py to return counts.
+                However, the user asked for "Toggle", implying counts should be available.
+                Let's check filter_base.py next. For now, putting placeholders or robust checks.
+                *Correction*: Let's check filter_base.py content first to see if counts are returned.
+                #}
+                {{ reg_rate.mf }}%
+            </td>
             <td><b>{{ quality_kpi.mf }}%</b></td>
         </tr>
 
         <tr>
             <td><b>DW</b></td>
-            <td>{{ improve_rate.dw.rate }}%</td>
-            <td>{{ reg_rate.dw }}%</td>
+            <td class="improve-cell" data-rate="{{ improve_rate.dw.rate }}"
+                data-improved="{{ improve_rate.dw.improved }}" data-total="{{ improve_rate.dw.total }}">
+                {{ improve_rate.dw.rate }}%
+            </td>
+            <td class="reg-cell" data-rate="{{ reg_rate.dw }}"
+                data-reg="{{ reg_rate.dw_reg_cnt if reg_rate.dw_reg_cnt is defined else 0 }}"
+                data-total="{{ reg_rate.dw_total_cnt if reg_rate.dw_total_cnt is defined else 0 }}">
+                {{ reg_rate.dw }}%
+            </td>
             <td><b>{{ quality_kpi.dw }}%</b></td>
         </tr>
 
         <tr class="table-primary">
             <td><b>Total</b></td>
-            <td>{{ improve_rate.total.rate }}%</td>
-            <td>{{ reg_rate.total }}%</td>
+            <td class="improve-cell" data-rate="{{ improve_rate.total.rate }}"
+                data-improved="{{ improve_rate.total.improved }}" data-total="{{ improve_rate.total.total }}">
+                {{ improve_rate.total.rate }}%
+            </td>
+            <td class="reg-cell" data-rate="{{ reg_rate.total }}"
+                data-reg="{{ reg_rate.total_reg_cnt if reg_rate.total_reg_cnt is defined else 0 }}"
+                data-total="{{ reg_rate.total_total_cnt if reg_rate.total_total_cnt is defined else 0 }}">
+                {{ reg_rate.total }}%
+            </td>
             <td><b>{{ quality_kpi.total }}%</b></td>
         </tr>
     </tbody>
 </table>
+
+<script>
+    function setImproveMode(mode) {
+        const improveCells = document.querySelectorAll('.improve-cell');
+        const regCells = document.querySelectorAll('.reg-cell'); // Will use if we have counts
+        const unitLabels = document.querySelectorAll('.unit-label');
+
+        if (mode === 'fraction') {
+            // Header Update
+            unitLabels.forEach(el => el.innerText = "(건수)");
+
+            // Improve Cells
+            improveCells.forEach(cell => {
+                const improved = cell.getAttribute('data-improved');
+                const total = cell.getAttribute('data-total');
+                cell.innerText = `${improved} / ${total}`;
+            });
+
+            // Reg Cells (Displaying 'N/A' or calculated if data missing, preventing 0/0 confusion if backend not ready)
+            // TODO: Need to backend update to pass counts for Registry Rate.
+            // For now, if attributes are missing/zero, might show rate or '?'
+            regCells.forEach(cell => {
+                // Temporary fallback: if we don't have counts, maybe stick to % or show ?
+                // But user asked for it. I suspect I need to update filter_base.py to pass counts.
+                // let's show what we have.
+                // If I cannot get counts, I will keep %.
+                // For now, let's assume I will update backend in next step.
+                const reg = cell.getAttribute('data-reg');
+                const total = cell.getAttribute('data-total');
+                cell.innerText = `${reg} / ${total}`;
+            });
+
+        } else {
+            // Header Update
+            unitLabels.forEach(el => el.innerText = "(%)");
+
+            // Revert to Rate
+            improveCells.forEach(cell => {
+                cell.innerText = cell.getAttribute('data-rate') + '%';
+            });
+            regCells.forEach(cell => {
+                cell.innerText = cell.getAttribute('data-rate') + '%';
+            });
+        }
+    }
+</script>

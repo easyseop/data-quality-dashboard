@@ -1,4 +1,17 @@
-<h4 class="fw-bold mb-3">🔎 품질 점검 결과 요약</h4>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">🔎 품질 점검 결과 요약</h4>
+
+    <!-- Premium Segmented Control Toggle -->
+    <div class="btn-group btn-group-sm" role="group" aria-label="Display Mode">
+        <input type="radio" class="btn-check" name="kpiToggle" id="btnKpiPercent" autocomplete="off" checked
+            onclick="toggleKpiDisplay('percent')">
+        <label class="btn btn-outline-primary" for="btnKpiPercent">%</label>
+
+        <input type="radio" class="btn-check" name="kpiToggle" id="btnKpiFraction" autocomplete="off"
+            onclick="toggleKpiDisplay('fraction')">
+        <label class="btn btn-outline-primary" for="btnKpiFraction">건수</label>
+    </div>
+</div>
 
 <table class="table table-bordered table-sm text-center align-middle">
     <thead class="table-light">
@@ -6,7 +19,7 @@
             <th></th>
             <th>검증컬럼</th>
             <th>오류컬럼</th>
-            <th>품질지수(%)</th>
+            <th id="kpiHeader">품질지수(%)</th>
         </tr>
     </thead>
     <tbody>
@@ -14,25 +27,65 @@
             <td><b>전체</b></td>
             <td>{{ kpi_all.verified }}</td>
             <td class="text-danger">{{ kpi_all.error }}</td>
-            <td><b>{{ kpi_all.quality }}%</b></td>
+            <td class="quality-cell warning-text fw-bold" data-verified="{{ kpi_all.verified }}"
+                data-error="{{ kpi_all.error }}" data-quality="{{ kpi_all.quality }}">
+                {{ kpi_all.quality }}%
+            </td>
         </tr>
         <tr>
             <td>인스턴스(I)</td>
             <td>{{ kpi_inst.verified }}</td>
             <td class="text-danger">{{ kpi_inst.error }}</td>
-            <td>{{ kpi_inst.quality }}%</td>
+            <td class="quality-cell" data-verified="{{ kpi_inst.verified }}" data-error="{{ kpi_inst.error }}"
+                data-quality="{{ kpi_inst.quality }}">
+                {{ kpi_inst.quality }}%
+            </td>
         </tr>
         <tr>
             <td>날짜(D)</td>
             <td>{{ kpi_date.verified }}</td>
             <td class="text-danger">{{ kpi_date.error }}</td>
-            <td>{{ kpi_date.quality }}%</td>
+            <td class="quality-cell" data-verified="{{ kpi_date.verified }}" data-error="{{ kpi_date.error }}"
+                data-quality="{{ kpi_date.quality }}">
+                {{ kpi_date.quality }}%
+            </td>
         </tr>
         <tr>
             <td>목록(L)</td>
             <td>{{ kpi_list.verified }}</td>
             <td class="text-danger">{{ kpi_list.error }}</td>
-            <td>{{ kpi_list.quality }}%</td>
+            <td class="quality-cell" data-verified="{{ kpi_list.verified }}" data-error="{{ kpi_list.error }}"
+                data-quality="{{ kpi_list.quality }}">
+                {{ kpi_list.quality }}%
+            </td>
         </tr>
     </tbody>
 </table>
+
+<script>
+    // No global default strictly needed if we pass mode relative to radio button, 
+    // but keeping it consistent with other widget.
+
+    function toggleKpiDisplay(mode) {
+        const cells = document.querySelectorAll('.quality-cell');
+        const header = document.getElementById('kpiHeader');
+
+        if (mode === 'fraction') {
+            // Switch to Fraction
+            header.innerText = "품질지수 (정상/전체)";
+            cells.forEach(cell => {
+                const v = parseInt(cell.getAttribute('data-verified')) || 0;
+                const e = parseInt(cell.getAttribute('data-error')) || 0;
+                const pass = v - e;
+                cell.innerText = `${pass} / ${v}`;
+            });
+        } else {
+            // Switch to Percent
+            header.innerText = "품질지수(%)";
+            cells.forEach(cell => {
+                const q = cell.getAttribute('data-quality');
+                cell.innerText = `${q}%`;
+            });
+        }
+    }
+</script>

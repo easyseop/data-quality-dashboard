@@ -2,6 +2,21 @@
 from flask import request
 from services.db import get_connection
 
+def get_sys_type(app_code):
+    return "mf" if app_code in ("APP001","APP002","APP003","APP004","APP005") else "dw"
+
+def get_result_union_sql(suffix=""):
+    return f"""
+        SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+        FROM DQ_MF_INST_RESULT{suffix} WHERE 기준년월일=%s
+        UNION ALL
+        SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+        FROM DQ_MF_DATE_RESULT{suffix} WHERE 기준년월일=%s
+        UNION ALL
+        SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
+        FROM DQ_MF_LIST_RESULT{suffix} WHERE 기준년월일=%s
+    """
+
 def load_base_date_rows():
     """DQ_BASE_DATE_INFO 전체 로딩 (공통)"""
     conn = get_connection()
@@ -12,11 +27,6 @@ def load_base_date_rows():
         FROM DQ_BASE_DATE_INFO
         ORDER BY 기준년월일 DESC
     """)
-
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
 
     rows = cur.fetchall()
     conn.close()
@@ -41,6 +51,8 @@ def query_table_summary(selected_base, app_code, table_suffix=""):
 
     params = [selected_base, selected_base, selected_base, selected_base]
 
+    union_sql = get_result_union_sql(table_suffix)
+
     sql = f"""
         SELECT
             A.기준년월일,
@@ -55,14 +67,7 @@ def query_table_summary(selected_base, app_code, table_suffix=""):
             ) AS error_rate
         FROM DQ_MF_ASSERTION_LIST{table_suffix} A
         LEFT JOIN (
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_INST_RESULT{table_suffix} WHERE 기준년월일 = %s
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_DATE_RESULT{table_suffix} WHERE 기준년월일 = %s
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_LIST_RESULT{table_suffix} WHERE 기준년월일 = %s
+            {union_sql}
         ) R
              ON  A.기준년월일 = R.기준년월일
             AND A.서버코드   = R.서버코드
@@ -269,29 +274,19 @@ def compute_improvement_rate(base_date):
     cur = conn.cursor()
 
     # --- 1) 정기 오류 컬럼 조회 ---
-    cur.execute("""
+    union_sql = get_result_union_sql("")
+    cur.execute(f"""
         SELECT A.어플리케이션코드 AS app_code, A.테이블명, A.컬럼명
         FROM DQ_MF_ASSERTION_LIST A
         JOIN (
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_INST_RESULT
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_DATE_RESULT
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_LIST_RESULT
+            {union_sql}
         ) R
         ON A.기준년월일 = R.기준년월일
         AND A.테이블명 = R.테이블명
         AND A.컬럼명 = R.컬럼명
         WHERE A.기준년월일=%s AND R.오류여부='Y'
-    """, (base_date,))
+    """, (base_date, base_date, base_date, base_date))
     regular_errors = cur.fetchall()
-
-    # --- 시스템 구분 함수 ---
-    def sys_type(app_code):
-        return "mf" if app_code in ("APP001","APP002","APP003","APP004","APP005") else "dw"
 
     # --- 정기 오류 목록 시스템별 count ---
     stats = {
@@ -302,7 +297,7 @@ def compute_improvement_rate(base_date):
 
     # 정기 오류 total count
     for row in regular_errors:
-        s = sys_type(row["app_code"])
+        s = get_sys_type(row["app_code"])
         stats[s]["total"] += 1
         stats["total"]["total"] += 1
 
@@ -322,24 +317,18 @@ def compute_improvement_rate(base_date):
         }
 
     # --- 3) 최신 수시 오류 조회 ---
-    cur.execute("""
+    union_sql_occa = get_result_union_sql("_OCCA")
+    cur.execute(f"""
         SELECT A.어플리케이션코드 AS app_code, A.테이블명, A.컬럼명, R.오류여부
         FROM DQ_MF_ASSERTION_LIST_OCCA A
         JOIN (
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_INST_RESULT_OCCA
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_DATE_RESULT_OCCA
-            UNION ALL
-            SELECT 기준년월일, 서버코드, 테이블명, 컬럼명, 오류여부
-            FROM DQ_MF_LIST_RESULT_OCCA
+            {union_sql_occa}
         ) R
         ON A.기준년월일 = R.기준년월일
         AND A.테이블명 = R.테이블명
         AND A.컬럼명 = R.컬럼명
         WHERE A.기준년월일=%s
-    """, (latest,))
+    """, (latest, latest, latest, latest))
     latest_rows = cur.fetchall()
 
     occa_map = {
@@ -350,7 +339,7 @@ def compute_improvement_rate(base_date):
     # --- 4) 개선 여부 계산 ---
     for row in regular_errors:
         key = (row["테이블명"], row["컬럼명"])
-        s = sys_type(row["app_code"])
+        s = get_sys_type(row["app_code"])
 
         if key in occa_map and occa_map[key] == "N":
             stats[s]["improved"] += 1
@@ -361,7 +350,12 @@ def compute_improvement_rate(base_date):
     for s in ("mf","dw","total"):
         total = stats[s]["total"]
         improved = stats[s]["improved"]
-        result[s] = {"rate": round(improved / total * 100, 2) if total else 0}
+        rate = round(improved / total * 100, 2) if total else 0
+        result[s] = {
+            "rate": rate,
+            "improved": improved,
+            "total": total
+        }
 
     result["latest_occa"] = latest or None
     return result
@@ -377,9 +371,6 @@ def compute_reg_rate(base_date):
     """, (base_date,))
     rows = cur.fetchall()
 
-    def sys_type(app_code):
-        return "mf" if app_code in ("APP001","APP002","APP003","APP004","APP005") else "dw"
-
     stats = {
         "mf": {"total":0, "reg":0},
         "dw": {"total":0, "reg":0},
@@ -387,7 +378,7 @@ def compute_reg_rate(base_date):
     }
 
     for r in rows:
-        s = sys_type(r["app_code"])
+        s = get_sys_type(r["app_code"])
         stats[s]["total"] += 1
         stats["total"]["total"] += 1
 
@@ -395,12 +386,20 @@ def compute_reg_rate(base_date):
             stats[s]["reg"] += 1
             stats["total"]["reg"] += 1
 
-    rate = {
-        s: round(stats[s]["reg"] / stats[s]["total"] * 100, 2) if stats[s]["total"] else 0
-        for s in ("mf","dw","total")
-    }
+    result = {}
+    for s in ("mf","dw","total"):
+        total = stats[s]["total"]
+        reg = stats[s]["reg"]
+        
+        rate = round(reg / total * 100, 2) if total else 0
+        
+        result[s] = rate
+        result[f"{s}_reg_cnt"] = reg
+        result[f"{s}_total_cnt"] = total
 
-    return rate
+    return result
+
+
 
 def compute_quality_kpi(improve_rate, reg_rate):
     return {
@@ -411,3 +410,151 @@ def compute_quality_kpi(improve_rate, reg_rate):
             )
         for s in ("mf","dw","total")
     }
+
+def compute_kpi_trend(base_date):
+    """
+    정기 기준일(base_date)부터 시작하여, 해당 정기 차수에 속하는 수시 차수들의 날짜별 KPI 추이를 계산함.
+    KPI = (오류개선율 * 0.5) + (정비계획등록률 * 0.5)
+    * 변경사항: 정비계획등록률 날짜별 동적 조회 (데이터 없으면 정기 기준일 값 fallback)
+    * 변경사항: Total 뿐만 아니라 MF, DW 각각의 KPI도 계산
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # 1. 정비계획 등록률 (Baseline - Fallback용)
+    reg_rate_base_map = compute_reg_rate(base_date)
+
+    # 2. 날짜 목록 조회 (정기 + 수시)
+    cur.execute("""
+        SELECT 기준년월일
+        FROM DQ_BASE_DATE_INFO
+        WHERE 정기검증기준년월일 = %s
+           OR 기준년월일 = %s  -- 본인(정기)도 포함
+        ORDER BY 기준년월일 ASC
+    """, (base_date, base_date))
+    rows = cur.fetchall()
+    
+    date_list = sorted(list(set([r["기준년월일"] for r in rows])))
+
+    # 3. 정기 기준일의 오류 목록 (Baseline) 조회 (+ System Type 구분)
+    #    AppCode를 알기 위해 ASSERTION_LIST와 조인 필요
+    union_sql = get_result_union_sql("")
+    cur.execute(f"""
+        SELECT A.어플리케이션코드 as app_code, A.테이블명, A.컬럼명
+        FROM DQ_MF_ASSERTION_LIST A
+        JOIN (
+            {union_sql}
+        ) R
+        ON A.기준년월일 = R.기준년월일
+        AND A.테이블명 = R.테이블명
+        AND A.컬럼명 = R.컬럼명
+        WHERE A.기준년월일=%s AND R.오류여부='Y'
+    """, (base_date, base_date, base_date, base_date))
+    
+    baseline_rows = cur.fetchall()
+    
+    # 시스템별 Baseline 오류 개수 및 Key 집합
+    baseline_info = {
+        "mf": {"count": 0, "keys": set()},
+        "dw": {"count": 0, "keys": set()},
+        "total": {"count": 0, "keys": set()}
+    }
+
+    for r in baseline_rows:
+        key = (r["테이블명"], r["컬럼명"])
+        sType = get_sys_type(r["app_code"])
+        
+        baseline_info[sType]["count"] += 1
+        baseline_info[sType]["keys"].add(key)
+        
+        baseline_info["total"]["count"] += 1
+        baseline_info["total"]["keys"].add(key)
+
+    trend_result = []
+
+    for d in date_list:
+        # --- A. 정비계획 등록률 (Dynamic + Fallback) ---
+        reg_map_curr = compute_reg_rate(d)
+        
+        # 데이터가 아예 없으면(total count=0) 정기 기준일 값(reg_rate_base_map) 사용
+        # compute_reg_rate 리턴 포맷: { "mf": rate, "dw": rate, "total": rate } (값은 float)
+        # 하지만 내부적으로 stats["total"]["total"] == 0 인지 확인하려면 compute_reg_rate 구조상 
+        # 결과값 0이 진짜 0인지 데이터 없음인지 모호할 수 있음.
+        # 편의상 등록률이 0이고 해당 날짜에 MAINT 테이블 데이터가 없는 경우를 Fallback으로 간주해야 하나,
+        # 여기서는 간단히 쿼리 결과 검증 대신, 외부에서직접 확인하거나 단순 가정 사용.
+        # *개선*: compute_reg_rate가 단순 rate만 주므로, 여기서는 "값이 0이면 혹시 데이터가 없는건가?" 의심 가능.
+        # 확실한 처리를 위해 check query를 날리거나, compute_reg_rate 로직을 믿음.
+        # Fallback 정책: 
+        # "해당 일자의 정비계획 테이블 데이터가 존재하지 않으면 Fallback" -> 이게 정확함.
+        # 성능상 매번 count하기보다, reg_map_curr가 0이면 fallback? (위험: 진짜 0%일수도)
+        # -> 일단 그대로 쓰고, 값이 너무 튀면 Fallback하는 로직보다는
+        #    Debug시 데이터가 없었으므로, 여기서는 "해당 일자 데이터 존재 여부"를 체크하는게 맞음.
+        
+        cur.execute("SELECT 1 FROM DQ_MAINT_PLAN_TABLE WHERE base_date=%s LIMIT 1", (d,))
+        has_maint_data = cur.fetchone()
+
+        if has_maint_data:
+            current_reg_rates = reg_map_curr
+        else:
+            current_reg_rates = reg_rate_base_map
+
+        # --- B. 오류 개선율 계산 ---
+        # 개선수 카운트
+        improved_counts = {"mf": 0, "dw": 0, "total": 0}
+
+        if d == base_date:
+            # 첫날은 개선율 0
+            pass
+        else:
+            if baseline_info["total"]["count"] > 0:
+                # 수시 오류 현황 조회
+                union_sql_occa = get_result_union_sql("_OCCA")
+                cur.execute(f"""
+                    SELECT 테이블명, 컬럼명, 오류여부
+                    FROM (
+                        {union_sql_occa}
+                    ) T
+                """, (d, d, d))
+                occa_rows = cur.fetchall()
+                occa_map = { (r["테이블명"], r["컬럼명"]): r["오류여부"] for r in occa_rows }
+
+                # 각 시스템별로 개선 여부 체크
+                for sType in ["mf", "dw", "total"]: # total도 별도 key set이 있으므로 순회
+                    for key in baseline_info[sType]["keys"]:
+                        if key in occa_map and occa_map[key] == 'N':
+                            improved_counts[sType] += 1
+
+        # --- C. KPI 계산 (System별) ---
+        row_data = { "date": d }
+        
+        for sType in ["mf", "dw", "total"]:
+            # 개선율
+            base_cnt = baseline_info[sType]["count"]
+            if base_cnt > 0:
+                imp_rate = (improved_counts[sType] / base_cnt) * 100
+            else:
+                imp_rate = 0.0
+            
+            # 등록률
+            reg_rate = current_reg_rates[sType] # mf, dw, total 키 존재
+            
+            # KPI
+            kpi = (imp_rate * 0.5) + (reg_rate * 0.5)
+            
+            # 결과 저장 (키 이름 분기)
+            # total -> kpi, improve_rate, reg_rate (기존 호환성)
+            # mf -> kpi_mf, improve_mf, reg_mf
+            # dw -> kpi_dw, improve_dw, reg_dw
+            
+            suffix = "" if sType == "total" else f"_{sType}"
+            
+            row_data[f"kpi{suffix}"] = round(kpi, 2)
+            row_data[f"improve_rate{suffix}"] = round(imp_rate, 2)
+            row_data[f"reg_rate{suffix}"] = reg_rate
+
+        trend_result.append(row_data)
+
+    cur.close()
+    conn.close()
+    
+    return trend_result

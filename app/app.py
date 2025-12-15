@@ -42,6 +42,9 @@ def dashboard():
     # ---- 정비계획(최근 3개월) ----
     maint_chart = get_maint_chart()
 
+    # ---- KPI 추세 차트 (신규) ----
+    trend_data = compute_kpi_trend(selected_base)
+
     return render_template(
         "dashboard.html",
         year_list=year_list,
@@ -62,6 +65,7 @@ def dashboard():
         improve_rate=improve_rate,
         reg_rate=reg_rate,
         quality_kpi=quality_kpi,
+        trend_data=trend_data,
     )
 
 

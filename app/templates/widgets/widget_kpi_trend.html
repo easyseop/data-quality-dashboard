@@ -1,0 +1,111 @@
+<div class="header d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow text-primary"></i> 품질 KPI 추세 (정기+수시)</h5>
+</div>
+<div class="widget-content">
+    <canvas id="kpiTrendChart" height="100"></canvas>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // --- KPI Trend Chart Rendering ---
+        const trendData = {{ trend_data | tojson
+    }};
+    if (trendData && trendData.length > 0) {
+        const ctx = document.getElementById('kpiTrendChart').getContext('2d');
+        const labels = trendData.map(d => d.date);
+
+        // 데이터셋 추출
+        const kpiTotal = trendData.map(d => d.kpi);
+        const kpiMf = trendData.map(d => d.kpi_mf);
+        const kpiDw = trendData.map(d => d.kpi_dw);
+
+        // (참고용) Total 상세 지표
+        // const improveRates = trendData.map(d => d.improve_rate);
+        // const regRates = trendData.map(d => d.reg_rate);
+
+        // 데이터가 1개뿐인 경우 점을 강조하기 위해 pointRadius 설정
+        const pointSettings = trendData.length === 1 ? { pointRadius: 6, pointHoverRadius: 8 } : {};
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Total KPI',
+                        data: kpiTotal,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.1,
+                        fill: false,
+                        ...pointSettings
+                    },
+                    {
+                        label: 'MF KPI',
+                        data: kpiMf,
+                        borderColor: 'rgba(54, 162, 235, 1)',  // Blue
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.1,
+                        fill: false,
+                        ...pointSettings
+                    },
+                    {
+                        label: 'DW KPI',
+                        data: kpiDw,
+                        borderColor: 'rgba(255, 159, 64, 1)',  // Orange
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.1,
+                        fill: false,
+                        ...pointSettings
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: '품질 지수 (점)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '검증 일자'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            footer: function (tooltipItems) {
+                                // 툴팁 하단에 추가 정보 표시 (선택된 Total 항목 기준)
+                                // const idx = tooltipItems[0].dataIndex;
+                                // const d = trendData[idx];
+                                // return `[Total 상세]\n오류개선율: ${d.improve_rate}%\n정비등록률: ${d.reg_rate}%`;
+                                return '';
+                            }
+                        }
+                    },
+                    subtitle: {
+                        display: trendData.length === 1,
+                        text: '※ 수시 검증 이력이 없어 정기 검증 결과(Baseline)만 표시됩니다.',
+                        color: 'red',
+                        font: { size: 12 }
+                    }
+                }
+            }
+        });
+    }
+    });
+</script>
